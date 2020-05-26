@@ -1024,16 +1024,18 @@ layout = [
 # Set window properties
 # Get title from file name
 if outbreak_filename is None:
-    window_title = 'Simple Hospital Outbreak Tracker'
+    gui_window_title = 'Simple Hospital Outbreak Tracker'
 else:
-    window_title = f'{outbreak_filename} - Simple Hospital Outbreak Tracker'
+    gui_window_title = f'{outbreak_filename} - Simple Hospital Outbreak Tracker'
+
+gui_window_title_set = gui_window_title
 
 # Get screen size and determine sane dimensons
 screen_width, screen_height = sg.Window.get_screen_size()
 window_width = screen_width//3
 window_height = int(screen_height/1.5)
 
-window = sg.Window(window_title, layout=layout, margins=(0, 0), size=(window_width,window_height), resizable=True, return_keyboard_events=True)
+window = sg.Window(gui_window_title, layout=layout, margins=(0, 0), size=(window_width,window_height), resizable=True, return_keyboard_events=True)
 window.read(timeout=1)
 #window.maximize()
 #window['_BODY_'].expand(expand_x=True, expand_y=True)
@@ -1056,14 +1058,33 @@ while True:             # Event Loop
         for tab_keys in shot['tab']['title'].keys():
             if tab_keys == 'welcome': continue
             window.FindElement(shot['tab']['title'][str(tab_keys)]).Update(disabled=True)
+        
+        # Empty welcome tab info bars (file and username strings)
+        window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
+        window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
+        window['welcome_tab_username_infokey'].update(' ' * (len(shot['msg_user']) + 3 )) # blank space to write over
+        window['welcome_tab_username_infoval'].update(' ' * (len('shot[username] here'))) # blank space to write over
+        
+        # Set window title string
+        gui_window_title = 'Simple Hospital Outbreak Tracker'
+
+                
     else:
         for tab_keys in shot['tab']['title'].keys():
             if tab_keys == 'welcome': continue
             # TODO check if num cases >2 for graphical plots (otherwise, it's a chore)
             # If there is 0-1 data record(s), show/activate linelist
             window.FindElement(shot['tab']['title'][str(tab_keys)]).Update(disabled=False)
-    
 
+        # Set window title string
+        gui_window_title = f'{outbreak_filename} - Simple Hospital Outbreak Tracker'
+    
+    
+    # Set window title
+    # TODO think this is tkinter only
+    if gui_window_title != gui_window_title_set:
+        window.TKroot.title(gui_window_title) # Might give errors on non-tkinter
+        gui_window_title_set = gui_window_title
     
     event, values = window.read()
     #print(event, values) # use for debugging (remove when finished)
@@ -1103,20 +1124,22 @@ while True:             # Event Loop
             window['welcome_tab_file_loaded_ok'].update(shot['msg_file_loaded_ok'])
             window['welcome_tab_username_infokey'].update(shot['msg_user'])
             window['welcome_tab_username_infoval'].update('shot[username] here')
+            
+    
+    # if outbreak_filename is None:
+        # # Reset welcome tab inputs
+        # window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
+        # window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
+        # window['welcome_tab_username_infokey'].update(' ' * (len(shot['msg_user']) + 3 )) # blank space to write over
+        # window['welcome_tab_username_infoval'].update(' ' * (len('shot[username] here'))) # blank space to write over
+        
+        # TODO other resets / clears here. E.g. redraw window using None as outbreak_filename
+        
 
-    
-    
-    
-    if outbreak_filename is None:
-        window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
-        window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
-        window['welcome_tab_username_infokey'].update(' ' * (len(shot['msg_user']) + 3 )) # blank space to write over
-        window['welcome_tab_username_infoval'].update(' ' * (len('shot[username] here'))) # blank space to write over
-   
     
     # Required for status bar
     window.Finalize()
-
+    
     # Update status bar string
     if status_message is None: status_message = event
     if outbreak_filename is None:
