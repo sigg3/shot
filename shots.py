@@ -189,7 +189,7 @@ def open_outbreak_file():
     
     outbreak_file.close()
     
-    # col0;col1;col2;col3;col4;col5
+
 
 def outbreak_file_sanity_pass(my_outbreak_file):
     """
@@ -226,6 +226,8 @@ def outbreak_file_sanity_pass(my_outbreak_file):
     # |  read_text(self, encoding=None, errors=None)
     # |  Open the file in text mode, read it, and close the file.
     
+    
+    
     # Sanity checks
     # Note: Using readline() solved all my CSV sniffer problems. Use instead of read(1024) in docs.
     if my_outbreak_file.is_file():
@@ -248,7 +250,7 @@ def outbreak_file_sanity_pass(my_outbreak_file):
                 
                 if (test_first_row[0][0] == 'rec_type') and (test_first_row[0][1] == 'col0') and (test_first_row[0][2] == 'col1'):
                     test_outbreak_file.close()
-                    print('OK format')
+                    print('OK format') # debug
                     return True
                 else:
                     popup_some_error(shot['err_wrong_data_format'])
@@ -478,6 +480,7 @@ def set_gui_strings(language):
     shot['file_file'] = 'File'
     shot['file_new'] = 'New Outbreak'
     shot['file_open'] = 'Open Outbreak'
+    shot['file_close'] = 'Close file'
     shot['file_save'] = 'Save'
     shot['file_save_as'] = 'Save As ...'
     shot['file_import'] = 'Import from spreadsheet'
@@ -570,6 +573,7 @@ def set_gui_strings(language):
         shot['file_file'] = 'Fil'
         shot['file_new'] = 'Nytt utbrudd'
         shot['file_open'] = 'Åpne utbrudd'
+        shot['file_close'] = 'Lukk fil'
         shot['file_save'] = 'Lagre'
         shot['file_save_as'] = 'Lagre som ..'
         shot['file_import'] = 'Importer fra regneark'
@@ -787,7 +791,7 @@ assert icon_bkg is not None, 'icon_bkg variable set to None (must not happen)'
 # Using string variables allows for easier translations
 
 menu_layout = [
-               [shot['file_file'], [shot['file_new'], shot['file_open'], shot['file_save'], shot['file_save_as'], shot['file_import'], shot['file_export_sheet'], shot['file_export_image'], shot['file_print'], shot['file_exit']]],
+               [shot['file_file'], [shot['file_new'], shot['file_open'], shot['file_save'], shot['file_save_as'], shot['file_import'], shot['file_export_sheet'], shot['file_export_image'], shot['file_close'], shot['file_print'], shot['file_exit']]],
                [shot['stats_stats'], [shot['stats_epicurve'], shot['stats_gchart'], shot['stats_compare'], shot['stats_filtering']]],
                [shot['settings_settings'], [shot['settings_encryption'], shot['settings_hospital'], [shot['settings_hospital_manage'], shot['settings_hospital_rooms']], shot['settings_language']]],
                [shot['help_help'], [shot['help_help_help'], shot['help_online'], shot['help_license'], shot['help_participate'], shot['help_about']]]
@@ -1062,7 +1066,7 @@ while True:             # Event Loop
 
     
     event, values = window.read()
-    print(event, values) # use for debugging (remove when finished)
+    #print(event, values) # use for debugging (remove when finished)
     
     print(f'event is:   {event}')
     print(f'values are: {values}')
@@ -1080,6 +1084,11 @@ while True:             # Event Loop
     elif event in shot['file_new'] or event in f"-{shot['icon_key_new']}-" or event in shot['icon_key_new']:
         popup_some_error('File-> New not implemented yet.')
         outbreak_filename = None
+    
+    elif event in shot['file_close']:
+        # todo
+        popup_some_error('Will prompt user to save if changes were made, then re-set and file = None')
+        outbreak_filename = None
         
     elif event in shot['file_open'] or event in f"-{shot['icon_key_open']}-" or event in shot['icon_key_open']:
         
@@ -1094,12 +1103,16 @@ while True:             # Event Loop
             window['welcome_tab_file_loaded_ok'].update(shot['msg_file_loaded_ok'])
             window['welcome_tab_username_infokey'].update(shot['msg_user'])
             window['welcome_tab_username_infoval'].update('shot[username] here')
-        else:
-            window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
-            window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
-            window['welcome_tab_username_infokey'].update(' ' * (len(shot['msg_user']) + 3 )) # blank space to write over
-            window['welcome_tab_username_infoval'].update(' ' * (len('shot[username] here'))) # blank space to write over
-            
+
+    
+    
+    
+    if outbreak_filename is None:
+        window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
+        window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
+        window['welcome_tab_username_infokey'].update(' ' * (len(shot['msg_user']) + 3 )) # blank space to write over
+        window['welcome_tab_username_infoval'].update(' ' * (len('shot[username] here'))) # blank space to write over
+   
     
     # Required for status bar
     window.Finalize()
