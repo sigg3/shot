@@ -791,7 +791,7 @@ assert icon_bkg is not None, 'icon_bkg variable set to None (must not happen)'
 # Using string variables allows for easier translations
 
 menu_layout = [
-               [shot['file_file'], [shot['file_new'], shot['file_open'], shot['file_save'], shot['file_save_as'], shot['file_import'], shot['file_export_sheet'], shot['file_export_image'], shot['file_close'], shot['file_print'], shot['file_exit']]],
+               [shot['file_file'], [shot['file_new'], shot['file_open'], shot['file_save'], shot['file_save_as'], shot['file_close'], shot['file_import'], shot['file_export_sheet'], shot['file_export_image'], shot['file_print'], shot['file_exit']]],
                [shot['stats_stats'], [shot['stats_epicurve'], shot['stats_gchart'], shot['stats_compare'], shot['stats_filtering']]],
                [shot['settings_settings'], [shot['settings_encryption'], shot['settings_hospital'], [shot['settings_hospital_manage'], shot['settings_hospital_rooms']], shot['settings_language']]],
                [shot['help_help'], [shot['help_help_help'], shot['help_online'], shot['help_license'], shot['help_participate'], shot['help_about']]]
@@ -1077,7 +1077,7 @@ while True:             # Event Loop
             window.FindElement(shot['tab']['title'][str(tab_keys)]).Update(disabled=False)
 
         # Set window title string
-        gui_window_title = f'{outbreak_filename} - Simple Hospital Outbreak Tracker'
+        gui_window_title = f'{Path(outbreak_filename).name} - Simple Hospital Outbreak Tracker'
     
     
     # Set window title
