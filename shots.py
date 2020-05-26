@@ -217,6 +217,17 @@ def outbreak_file_sanity_pass(my_outbreak_file):
         test_outbreakf = test_outbreak_file.read(9999) # .sniff(csvfile.read(1024),delimiters=',"')
         test_outbreak_file.close()
 #        if csv.Sniffer().sniff(test_outbreakf).has_header: # This does not work, the delim is horrible TODO
+
+        # has_header fails because delim unset.
+        # We do not have to detect delim, since we are origin of "outbreak CSV" files.
+        # Pick a dialect (e.g. Excel) and stick to it.
+        #
+        #
+        # TODO rewrite
+        # check needs to check has_headers AFTER loading file
+        # check can see whether the first 3 columns have expected values.
+        # if not, abort
+
         if csv.Sniffer().has_header(test_outbreakf):
             if csv.Sniffer().sniff(test_outbreakf).delimiter == ";":
                 test_outbreakf = open(my_outbreak_file,'r')
