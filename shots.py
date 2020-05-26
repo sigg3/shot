@@ -190,31 +190,18 @@ def open_outbreak_file():
     outbreak_file.close()
     
     # col0;col1;col2;col3;col4;col5
-    
-    
 
-# File Open popup
-def popup_open_outbreak_file():
+def outbreak_file_sanity_pass(check_file):
     """
-    if open_outbreak_file(): will return True if file exist(s).
-    Returns Path object or None
+    Collection of sanity checks of outbreak files run before loading and saving csv files
+    Returns bool. Only True iff all required checks pass.
     """
     
-    # This is weird but it works
-    my_outbreak_file = sg.popup_get_file(shot['file_open'], title=shot['file_open'], save_as=False, multiple_files=False, file_types=(('Outbreak CSV', '*.csv'),), no_window=True, keep_on_top=True)
-
-    if type(my_outbreak_file) is str:
-        if my_outbreak_file == '': # seems to happen the 2nd time around that the sg.popup_get_file tuple returns an empty string
-            my_outbreak_file = None
-        else:
-            print(f'my_outbreak_file={my_outbreak_file}') # debug
-            print(f'type(my_outbreak_file)={type(my_outbreak_file)}') # debug
-    else:
-        my_outbreak_file = None # bugfix for Cancel op
-    
-    # Convert to path object
+    # Convert str to path
     # TODO latest python does not require string object for Path
-    if my_outbreak_file is not None:
+    if my_outbreak_file is None:
+        return False
+    else:
         try:
             my_outbreak_file = Path(str(my_outbreak_file))
         except:
@@ -222,16 +209,15 @@ def popup_open_outbreak_file():
                 my_outbreak_file = Path(my_outbreak_file) # might be useful for newer pythons..?
             except:
                 popup_some_error(f"{shot['err_weird_data_string']}")
-                my_outbreak_file = None
+                return False
     
-    # Do other sanity checks here, bro
-    if my_outbreak_file is None:
-        return False # lazy eval takes care of is_file() error on None type object
-    elif my_outbreak_file.is_file():
+    # Sanity checks
+    if check_file.is_file():
         test_outbreak_file = open(my_outbreak_file,'r')
-        test_outbreakf = test_outbreak_file.read(9999)
+        test_outbreakf = test_outbreak_file.read(9999) # .sniff(csvfile.read(1024),delimiters=',"')
         test_outbreak_file.close()
-        if csv.Sniffer().has_header(test_outbreakf):
+        if csv.Sniffer().sniff(test_outbreakf).has_header: # This does not work, the delim is horrible TODO
+#        if csv.Sniffer().has_header(test_outbreakf):
             if csv.Sniffer().sniff(test_outbreakf).delimiter == ";":
                 test_outbreakf = open(my_outbreak_file,'r')
                 first_row_outbreakf = []
@@ -243,20 +229,41 @@ def popup_open_outbreak_file():
                     print(f'{my_outbreak_file} verified outbreak file.')
                 else:
                     popup_some_error(shot['err_wrong_data_format'])
-                    my_outbreak_file = None
             else:
                 popup_some_error(shot['err_incorrect_delim'])
-                my_outbreak_file = None
         else:
             popup_some_error(shot['err_no_headers'])
-            my_outbreak_file = None
-    
-    if my_outbreak_file is None:
-        return False
     else:
+        popup_some_error(shot['err_input_notafile'])
+    return False
+
+
+# File Open popup
+def popup_open_outbreak_file():
+    """
+    graphical user interface part of locating and opening files.
+    'if popup_open_outbreak_file():' conditional will return True if file is sane.
+    returns bool: True if file open success. (If True, set outbreak_filename global to input).
+    """
+    
+    # This is weird but it works
+    my_outbreak_file = sg.popup_get_file(shot['file_open'], title=shot['file_open'], save_as=False, multiple_files=False, file_types=(('Outbreak CSV', '*.csv'),), no_window=True, keep_on_top=True)
+
+    if type(my_outbreak_file) is str and my_outbreak_file != '':
+            print(f'my_outbreak_file={my_outbreak_file}') # debug
+            print(f'type(my_outbreak_file)={type(my_outbreak_file)}') # debug
+    else:
+         # bugfix for Cancel op: sg.popup_get_file returns tuple
+         # bugfix for cancel x2: 2nd time around the sg.popup_get_file which normally is tuple returns empty string
+        return False
+    
+    if outbreak_file_sanity_pass(my_outbreak_file):
         global outbreak_filename
         outbreak_filename = my_outbreak_file
-        return True
+        return True        
+    else:
+        return False
+    
 
 
 # Main Tabs
@@ -266,22 +273,28 @@ def popup_open_outbreak_file():
 # Tab 0: welcome
 def tab_welcome(outbreak_filename):
     """
-    Returns list containing Welcome tab contents.
-    Content is conditional on file being loaded.
+    Returns list containing Welcome tab contents. Content is conditional on file being loaded.
     """
     
     if outbreak_filename is None:
         welcome_tab_filename = shot['msg_no_file_loaded']
         welcome_tab_loadfile = f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}"
+        welcome_tab_user_key = ''
+        welcome_tab_username = ''
     else:
         welcome_tab_filename = outbreak_filename
         welcome_tab_loadfile = shot['msg_file_loaded_ok']
+        welcome_tab_user_key = f"{shot['msg_user']}: "
+        welcome_tab_username = 'user-name-string-here'
+        
     
     # TODO
     shot['version'] = "0.01 alpha" # TODO set dict_version from global string atop
     my_welcome_tab = [[sg.T(' ')],
                       [sg.Image(filename=None, data=shot['icon_logo'], size=(120,120), pad=(2,2)), sg.T(f"Simple Hospital Outbreak Tracker\nA Free and Open Source Public Health Software Project\nCopyright (C) 2020, GNU GPL v.3. Version: {shot['version']}", font=('Sans serif', 16))],
                       [sg.T(f"\n{shot['tab']['tip']['welcome']}\n")],
+                      [sg.T(welcome_tab_user_key, key='welcome_tab_username_infokey'), sg.T(welcome_tab_username, key='welcome_tab_username_infoval')],
+                      welcome_tab_username,
                       [sg.T(f"{shot['file_file']}: "), sg.InputText(welcome_tab_filename, key='welcome_tab_file_loaded_infobar', size=(75,1), background_color=None, enable_events=True, disabled=True)],
                       [sg.T(welcome_tab_loadfile, key='welcome_tab_file_loaded_ok')],
                       [sg.T(' '), sg.In(' ', visible=False, key=f"+{shot['icon_key_open']}+")],
@@ -518,7 +531,7 @@ def set_gui_strings(language):
     shot['err_incorrect_delim'] = 'Incorrect file type. Incorrect delimiter detected.'
     shot['err_no_headers'] = 'Incorrect file type. File did not contain any headers..'
     shot['err_weird_data_string'] = 'Weird. Cannot convert input file string to Path object.'
-    
+    shot['err_input_notafile'] = 'Incorrect input. Input is not a file.'
     
     # Set translated language string
     if language == 'English':
@@ -605,6 +618,7 @@ def set_gui_strings(language):
         shot['err_wrong_data_format'] = 'Feil filtype. Filen har ikke riktig type data.'
         shot['err_incorrect_delim'] = 'Feil filtype. Filen har ikke riktig delimiter.'
         shot['err_no_headers'] = 'Feil filtype. Filen har ingen overskrifter.'
+        shot['err_input_notafile'] = 'Feil objekt. Inndata er ikke en fil.'
         
         
         # Finally, append this language to list (towards the bottom of the function)
@@ -1048,9 +1062,13 @@ while True:             # Event Loop
         if popup_open_outbreak_file():
             window['welcome_tab_file_loaded_infobar'].update(str(outbreak_filename))
             window['welcome_tab_file_loaded_ok'].update(shot['msg_file_loaded_ok'])
+            window['welcome_tab_username_infokey'].update(shot['msg_user'])
+            window['welcome_tab_username_infoval'].update('shot[username] here')
         else:
             window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
             window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
+            window['welcome_tab_username_infokey'].update(shot['msg_user'])
+            window['welcome_tab_username_infoval'].update('shot[username] here')
             
     
     # Required for status bar
