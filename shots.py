@@ -211,43 +211,58 @@ def outbreak_file_sanity_pass(my_outbreak_file):
                 popup_some_error(f"{shot['err_weird_data_string']}")
                 return False
     
+
+    # TODO
+    # Check that file is not open/locked + perm
+    
+    
+    # Note to self:
+    # Path has an OPEN and a READ command
+    #
+    # |  open(self, mode='r', buffering=-1, encoding=None, errors=None, newline=None)
+    # |  Open the file pointed by this path and return a file object, as
+    # |  the built-in open() function does.
+    #
+    # |  read_text(self, encoding=None, errors=None)
+    # |  Open the file in text mode, read it, and close the file.
+    
     # Sanity checks
+    # Note: Using readline() solved all my CSV sniffer problems. Use instead of read(1024) in docs.
     if my_outbreak_file.is_file():
         test_outbreak_file = open(my_outbreak_file,'r')
-        test_outbreakf = test_outbreak_file.read(9999) # .sniff(csvfile.read(1024),delimiters=',"')
-        test_outbreak_file.close()
-#        if csv.Sniffer().sniff(test_outbreakf).has_header: # This does not work, the delim is horrible TODO
-
-        # has_header fails because delim unset.
-        # We do not have to detect delim, since we are origin of "outbreak CSV" files.
-        # Pick a dialect (e.g. Excel) and stick to it.
-        #
-        #
-        # TODO rewrite
-        # check needs to check has_headers AFTER loading file
-        # check can see whether the first 3 columns have expected values.
-        # if not, abort
-
-        if csv.Sniffer().has_header(test_outbreakf):
-            if csv.Sniffer().sniff(test_outbreakf).delimiter == ";":
-                test_outbreakf = open(my_outbreak_file,'r')
-                first_row_outbreakf = []
-                for row in csv.reader(test_outbreakf, delimiter = ";"):
-                    first_row_outbreakf.append(row)
+        #test_outbreakf = test_outbreak_file.read(9999) # .sniff(csvfile.read(1024),delimiters=',"')
+        #dialect = csv.Sniffer().sniff(test_outbreak_file.readline())
+        test_outbreak_file.seek(0)
+        
+        if csv.Sniffer().sniff(test_outbreak_file.readline()).delimiter == ";":
+            print('file has delim') # debug
+            
+            if csv.Sniffer().has_header(test_outbreak_file.readline()):
+                print('file has headers')  # debug
+                
+                test_first_row = []
+                test_outbreak_file.seek(0) # re-set reader
+                for row in csv.reader(test_outbreak_file, delimiter = ";"):
+                    test_first_row.append(row)
                     break
-                test_outbreakf.close()
-                if first_row_outbreakf[0][0] == 'rec_type':
-                    print(f'{my_outbreak_file} verified outbreak file.')
+                
+                if (test_first_row[0][0] == 'rec_type') and (test_first_row[0][1] == 'col0') and (test_first_row[0][2] == 'col1'):
+                    test_outbreak_file.close()
+                    print('OK format')
+                    return True
                 else:
                     popup_some_error(shot['err_wrong_data_format'])
             else:
-                popup_some_error(shot['err_incorrect_delim'])
+                popup_some_error(shot['err_no_headers'])
         else:
-            popup_some_error(shot['err_no_headers'])
+            popup_some_error(shot['err_incorrect_delim'])
     else:
         popup_some_error(shot['err_input_notafile'])
+        
+        
+    # close file and leave function
+    test_outbreak_file.close()
     return False
-
 
 # File Open popup
 def popup_open_outbreak_file():
@@ -295,8 +310,8 @@ def tab_welcome(outbreak_filename):
     if outbreak_filename is None:
         welcome_tab_filename = shot['msg_no_file_loaded']
         welcome_tab_loadfile = f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}"
-        welcome_tab_user_key = ' '
-        welcome_tab_username = ' '
+        welcome_tab_user_key = ' ' * ( len(shot['msg_user']) + 3 )
+        welcome_tab_username = ' ' * 120
     else:
         welcome_tab_filename = outbreak_filename
         welcome_tab_loadfile = shot['msg_file_loaded_ok']
@@ -1079,11 +1094,11 @@ while True:             # Event Loop
             window['welcome_tab_file_loaded_ok'].update(shot['msg_file_loaded_ok'])
             window['welcome_tab_username_infokey'].update(shot['msg_user'])
             window['welcome_tab_username_infoval'].update('shot[username] here')
-#        else:
-#            window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
-#            window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
-#            window['welcome_tab_username_infokey'].update(shot['msg_user'])
-#            window['welcome_tab_username_infoval'].update('shot[username] here')
+        else:
+            window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
+            window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
+            window['welcome_tab_username_infokey'].update(' ' * (len(shot['msg_user']) + 3 )) # blank space to write over
+            window['welcome_tab_username_infoval'].update(' ' * (len('shot[username] here'))) # blank space to write over
             
     
     # Required for status bar
