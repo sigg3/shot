@@ -191,7 +191,7 @@ def open_outbreak_file():
     
     # col0;col1;col2;col3;col4;col5
 
-def outbreak_file_sanity_pass(check_file):
+def outbreak_file_sanity_pass(my_outbreak_file):
     """
     Collection of sanity checks of outbreak files run before loading and saving csv files
     Returns bool. Only True iff all required checks pass.
@@ -212,12 +212,12 @@ def outbreak_file_sanity_pass(check_file):
                 return False
     
     # Sanity checks
-    if check_file.is_file():
+    if my_outbreak_file.is_file():
         test_outbreak_file = open(my_outbreak_file,'r')
         test_outbreakf = test_outbreak_file.read(9999) # .sniff(csvfile.read(1024),delimiters=',"')
         test_outbreak_file.close()
-        if csv.Sniffer().sniff(test_outbreakf).has_header: # This does not work, the delim is horrible TODO
-#        if csv.Sniffer().has_header(test_outbreakf):
+#        if csv.Sniffer().sniff(test_outbreakf).has_header: # This does not work, the delim is horrible TODO
+        if csv.Sniffer().has_header(test_outbreakf):
             if csv.Sniffer().sniff(test_outbreakf).delimiter == ";":
                 test_outbreakf = open(my_outbreak_file,'r')
                 first_row_outbreakf = []
@@ -253,15 +253,20 @@ def popup_open_outbreak_file():
             print(f'my_outbreak_file={my_outbreak_file}') # debug
             print(f'type(my_outbreak_file)={type(my_outbreak_file)}') # debug
     else:
-         # bugfix for Cancel op: sg.popup_get_file returns tuple
-         # bugfix for cancel x2: 2nd time around the sg.popup_get_file which normally is tuple returns empty string
+        # User clicked cancel
+        # bugfix Cancel op: sg.popup_get_file returns tuple
+        # bugfix cancel x2: 2nd time the sg.popup_get_file which normally is tuple returns empty string
         return False
     
+    # set global filename var
+    global outbreak_filename
+
+    # sanity check
     if outbreak_file_sanity_pass(my_outbreak_file):
-        global outbreak_filename
         outbreak_filename = my_outbreak_file
-        return True        
+        return True
     else:
+        outbreak_filename = None
         return False
     
 
@@ -279,8 +284,8 @@ def tab_welcome(outbreak_filename):
     if outbreak_filename is None:
         welcome_tab_filename = shot['msg_no_file_loaded']
         welcome_tab_loadfile = f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}"
-        welcome_tab_user_key = ''
-        welcome_tab_username = ''
+        welcome_tab_user_key = ' '
+        welcome_tab_username = ' '
     else:
         welcome_tab_filename = outbreak_filename
         welcome_tab_loadfile = shot['msg_file_loaded_ok']
@@ -294,7 +299,6 @@ def tab_welcome(outbreak_filename):
                       [sg.Image(filename=None, data=shot['icon_logo'], size=(120,120), pad=(2,2)), sg.T(f"Simple Hospital Outbreak Tracker\nA Free and Open Source Public Health Software Project\nCopyright (C) 2020, GNU GPL v.3. Version: {shot['version']}", font=('Sans serif', 16))],
                       [sg.T(f"\n{shot['tab']['tip']['welcome']}\n")],
                       [sg.T(welcome_tab_user_key, key='welcome_tab_username_infokey'), sg.T(welcome_tab_username, key='welcome_tab_username_infoval')],
-                      welcome_tab_username,
                       [sg.T(f"{shot['file_file']}: "), sg.InputText(welcome_tab_filename, key='welcome_tab_file_loaded_infobar', size=(75,1), background_color=None, enable_events=True, disabled=True)],
                       [sg.T(welcome_tab_loadfile, key='welcome_tab_file_loaded_ok')],
                       [sg.T(' '), sg.In(' ', visible=False, key=f"+{shot['icon_key_open']}+")],
@@ -494,7 +498,7 @@ def set_gui_strings(language):
     shot['icon_print'] = 'Send to printer'
     shot['icon_list_add'] = 'Add line'
     shot['icon_list_rem'] = 'Remove line'
-    shot['icon_new_str'] = 'Create New Outbreak'
+    shot['icon_new_str'] = 'Register New Outbreak'
     shot['icon_open_str'] = 'Open Existing Outbreak'
     
     # Strings for status messages
@@ -1048,7 +1052,7 @@ while True:             # Event Loop
         window.Finalize()
         status_message = 'Printing ..'
     elif event in shot['file_new'] or event in f"-{shot['icon_key_new']}-" or event in shot['icon_key_new']:
-        popup_some_error('Weird. Cannot convert my_outbreak_file to Path object.')
+        popup_some_error('File-> New not implemented yet.')
         outbreak_filename = None
         
     elif event in shot['file_open'] or event in f"-{shot['icon_key_open']}-" or event in shot['icon_key_open']:
@@ -1064,11 +1068,11 @@ while True:             # Event Loop
             window['welcome_tab_file_loaded_ok'].update(shot['msg_file_loaded_ok'])
             window['welcome_tab_username_infokey'].update(shot['msg_user'])
             window['welcome_tab_username_infoval'].update('shot[username] here')
-        else:
-            window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
-            window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
-            window['welcome_tab_username_infokey'].update(shot['msg_user'])
-            window['welcome_tab_username_infoval'].update('shot[username] here')
+#        else:
+#            window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
+#            window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
+#            window['welcome_tab_username_infokey'].update(shot['msg_user'])
+#            window['welcome_tab_username_infoval'].update('shot[username] here')
             
     
     # Required for status bar
