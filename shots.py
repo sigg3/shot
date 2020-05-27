@@ -33,9 +33,9 @@ sg.theme(set_theme)
 
 # Set sane defaults
 shot = {}
-shot['is_configured'] = False
 outbreak_filename = None
-
+shot_config_file = Path.cwd()/Path('settings.ini')
+default_language_setting = 'English'
 
 # TODO ConfigParser to set is_configured to True
 # Requrires just name, language/locale, hospital(s)
@@ -46,6 +46,53 @@ outbreak_filename = None
 # string(hospital) use function for strings?
 
 # Tabbed design (check audio rec)
+
+
+# Configuration file (settings.ini)
+def read_config_from(config_file):
+    """
+    Sets shot dict vars based on a .ini settings file in cwd
+    Returns bool (True iff configured and False if unconfigured)
+    """
+    
+    config = configparser.ConfigParser()
+    config.read(str(config_file))
+    
+    if 'DEFAULT' in config:
+        
+        # User is required for setting
+        my_user = config.get('DEFAULT', 'user', fallback=None) # NOICE
+        if my_user is None: return False
+        
+        # Language is required for setting
+        my_lang = config.get('DEFAULT', 'language', fallback='English')
+        if my_lang is None: return False
+        
+        
+        my_hospital = config.get('DEFAULT', 'hospital', fallback=None)
+        my_unique = config.get('DEFAULT', 'unique', fallback='FNR')
+        
+    else:
+        return False
+    
+    my_recent_files = []
+    if 'RECENT' in config:
+        for x in range(1,6):
+            if x in config['RECENT']:
+                my_recent_files.append(config['RECENT'][x])
+    
+    
+    for sect in config.sections():
+        if sect in ('DEFAULT', 'RECENT'): continue
+        print(sect)
+    
+    
+    
+    
+    if my_hospital is not None:
+        pass
+        
+    
 
 
 # FUNCTIONS
@@ -507,7 +554,7 @@ def import_from_csv(input_file):
     # Read csv into list structure
     df = pd.read_csv(filename, sep=';', engine='python', header=None)
     outbreak_data = df.values.tolist() # read everything else into a list of rows
-    outbreak_inf    
+    #outbreak_inf    
    
 
 # tab_outbreak_intro = 'Outbreak Overview'
@@ -851,8 +898,26 @@ def set_gui_icons():
 
 
 
+
+# Read config
+if shot_config_file.is_file():
+    print(f'Reading {shot_config_file}')
+    shot['is_configured'] = read_config_from(shot_config_file)
+else:
+    # A session turns into a configured session once the user saves a file ..
+    # Once a user saves a file, a settings.ini is created.
+    shot['is_configured'] = False
+
+if shot['is_configured']:
+    print('Running SHOT in configured mode.')
+else:
+    shot['conf_gui_lang'] = default_language_setting
+    print('Running SHOT in unconfigured mode.')
+
+
+# Set GUI dependining on config (if any)
 #set_gui_strings('Norwegian')
-set_gui_strings('English')
+set_gui_strings(shot['conf_gui_lang'])
 set_gui_icons()
 
 
