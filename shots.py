@@ -47,8 +47,59 @@ default_language_setting = 'English'
 
 # Tabbed design (check audio rec)
 
+# Write Configuration file (settings.ini)
+def write_config_to(config_file):
+    """
+    Creates a settings.ini file using configparser
+    Only used to set some permanent preferences for ease of use
+    """
+    
+    config = configparser.ConfigParser()
+    
+    # Set the defaults
+    config['DEFAULT'] = {
+                        'user': shot['conf_user'],
+                        'language': shot['conf_lang'],
+                        'unique': shot['conf_uniq'],
+                        'hospital': shot['conf_hosp'] # This is hospital set
+                        }
+    
+    # See if we have any recent files stored on dict
+    # TODO write RECENT sect
+    
+    
+    
+    # See if we have set any hospital(s) (Settings->Hospital)
+    # These are ALL hospitals that we know of (in file and from earlier config reads)
+    
+        
+    
+    
+    # Finally, write to file
+    with open(str(config_file), 'w') as configfile:
+        config.write(configfile)
+    
+    
 
-# Configuration file (settings.ini)
+    # >>> import configparser
+# >>> config = configparser.ConfigParser()
+# >>> config['DEFAULT'] = {'ServerAliveInterval': '45',
+# ...                      'Compression': 'yes',
+# ...                      'CompressionLevel': '9'}
+# >>> config['bitbucket.org'] = {}
+# >>> config['bitbucket.org']['User'] = 'hg'
+# >>> config['topsecret.server.com'] = {}
+# >>> topsecret = config['topsecret.server.com']
+# >>> topsecret['Port'] = '50022'     # mutates the parser
+# >>> topsecret['ForwardX11'] = 'no'  # same here
+# >>> config['DEFAULT']['ForwardX11'] = 'yes'
+# >>> with open('example.ini', 'w') as configfile:
+# ...   config.write(configfile)
+    
+    
+
+
+# Read Configuration file (settings.ini)
 def read_config_from(config_file):
     """
     Sets shot dict vars based on a .ini settings file in cwd
@@ -68,12 +119,12 @@ def read_config_from(config_file):
         my_lang = config.get('DEFAULT', 'language', fallback='English')
         if my_lang is None: return False
         
-        
+        # Optional values
         my_hospital = config.get('DEFAULT', 'hospital', fallback=None)
         my_unique = config.get('DEFAULT', 'unique', fallback='FNR')
-        
     else:
         return False
+    
     
     my_recent_files = []
     if 'RECENT' in config:
@@ -91,6 +142,13 @@ def read_config_from(config_file):
     
     if my_hospital is not None:
         pass
+    
+    # Set vars in config
+    shot['conf_user'] = my_user
+    shot['conf_lang'] = my_lang 
+    shot['conf_uniq'] = my_unique
+    shot['conf_hosp'] = my_hospital
+    shot['conf_recent'] = my_recent_files # list
         
     
 
@@ -284,7 +342,11 @@ def popup_new_hospital():
     A hospital contains buildings, departments and rooms (which can be physically connected)
     This is a work-in-progress but might provide capability to display infection heatmap onto "map"
     """
-
+    
+    # If there is no hospital configured for this user (settings.ini file)
+    # Then the new one will automatically be the selected on (in settings.ini file)
+    # See configparser functions for more info
+    
     # Hospital name (string)
     # 
     
@@ -911,13 +973,17 @@ else:
 if shot['is_configured']:
     print('Running SHOT in configured mode.')
 else:
-    shot['conf_gui_lang'] = default_language_setting
     print('Running SHOT in unconfigured mode.')
+    shot['conf_user'] = None
+    shot['conf_lang'] = default_language_setting
+    shot['conf_uniq'] = 'FNR'
+    shot['conf_hosp'] = None
+    shot['conf_recent'] = None
 
 
 # Set GUI dependining on config (if any)
 #set_gui_strings('Norwegian')
-set_gui_strings(shot['conf_gui_lang'])
+set_gui_strings(shot['conf_lang'])
 set_gui_icons()
 
 
@@ -1242,6 +1308,9 @@ window.read(timeout=1)
 
 # FOR ini filer (se eksempelvis shot.ini)
 # https://docs.python.org/3/library/configparser.html
+
+
+# TODO if __name__ == '__main__' all of the runtime stuff
 
 
 while True:             # Event Loop
