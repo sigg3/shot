@@ -6,6 +6,7 @@
 import PySimpleGUI as sg
 import pandas as pd
 import time, csv
+import configparser
 from pathlib import Path
 
 # Setup PySimpleGUI
@@ -16,7 +17,7 @@ sg.theme(set_theme)
 #fontSize = 16
 
 # sha512 for hashing passwords (not stored)
-from hashlib import sha512
+#from hashlib import sha512
 
 # deprecated
 #import rockikz_crypt
@@ -30,8 +31,17 @@ from hashlib import sha512
 # Check if there are cli arguments
 # Argument 1 is file name. If it exists, load it (open); if not, create it (new).
 
+# Set sane defaults
+shot = {}
+shot['is_configured'] = False
 outbreak_filename = None
 
+
+# TODO ConfigParser to set is_configured to True
+# Requrires just name, language/locale, hospital(s)
+#
+
+    
 # digctionary
 # string(hospital) use function for strings?
 
@@ -148,7 +158,109 @@ def popup_some_error(show_str):
     # keep_on_top=False,
     # location=(None, None))
     
+def popup_new_outbreak():
     
+    new_outbreak_info = [
+       [sg.Text('col Row 1')],
+       [sg.Text('col Row 2'), sg.Input('col input 1')],
+       [sg.Text('col Row 3'), sg.Input('col input 2')],
+       [sg.Text('col Row 4'), sg.Input('col input 3')],
+       [sg.Text('col Row 5'), sg.Input('col input 4')],
+       [sg.Text('col Row 6'), sg.Input('col input 5')],
+       [sg.Text('col Row 7'), sg.Input('col input 6')]
+       ]
+    
+    
+    new_outbreak_layout = [
+                          [sg.Column(new_outbreak_info)],
+                          [sg.In('Last input')],
+                          [sg.OK()]
+                          ]
+    
+    new_outbreak = sg.Window(shot['file_new'], new_outbreak_layout)
+    # TODO register events here
+
+
+# Note on HOSPITAL INFO
+# A hospital is a "top container" in SHOT (we can only manage 1 at a time)
+# A hospital is the parent of buildings, departments and rooms
+# Since buildings, rooms and departments do not exist in 1-1 relationship, they are horizontal
+#
+#            Hospital
+#               |
+#       ,-------^-------.
+#  Buildings       Departments
+#          \        /
+#             Rooms
+#
+#
+# A room has 2 parents: Department, Building
+# A Department has 1 parent: Hospital
+# A Building has 1 parent: Hospital
+# A hospital might have >1 buildings and >1 departments
+#
+# Buildings and departments could have been identified, but the separation is one of function.
+# Employees in one department might be spread across two buildings.
+# Employees in one building might be spread across multiple buildings.
+#
+# The distinction is necessary to track outbreak both geographically and within hospital functions
+# Just my two cents.
+
+
+def popup_new_building():
+    """
+    Creates a new building (child of hospital)
+    """
+    pass
+    
+
+def popup_new_department():
+    """
+    Creates a new department (child of hospital)
+    A department may exist in >1 building, but at a minimum 1.
+    """
+    pass
+
+
+def popup_new_room():
+    """
+    Creates a new hospital room (child of hospital)
+    Rooms belongs physically to a building and logically to a department
+    """
+    pass
+
+
+
+def popup_new_hospital():
+    """
+    Creates a new hospital (and a new hospital class entry in config)
+    A hospital contains buildings, departments and rooms (which can be physically connected)
+    This is a work-in-progress but might provide capability to display infection heatmap onto "map"
+    """
+
+    # Hospital name (string)
+    # 
+    
+    
+    
+
+def new_outbreak_file():
+    """
+    Runs the popup_new_outbreak
+    Returns filename (or None 
+    """
+    
+    # Get hospital info from config parser
+    if shot['is_configured']:
+        # TODO get hospital info
+        # Note: this might be the wrong hospital, if so, user must change this in Settings->Hospital
+        pass
+    else:
+        # TODO setup hospital info and 
+        pass
+    
+    pass
+
     
 def open_outbreak_file():
     """
@@ -162,7 +274,22 @@ def open_outbreak_file():
     shot['tseries'] = {}
     shot['admin'] = {}
     shot['hospital'] = {}
-    shot['rooms'] = {}
+
+#                                       len(shot['hospital']['building'])
+#                                                     |
+#                                                     |     len(shot['hospital']['department'])
+#                                                     |                     |               
+#                                                     |                     |        len(shot['hospital']['room'])  
+#                                                     |                     |               |
+#                                                     v                     v               v
+#   shot['hospital'] = {'name': <str>, 'buildings': <int>, 'departments': <int>, 'rooms': <int>, room: <dict>}
+#
+#   shot['hospital']['room'] = []
+#   shot['hospital']['room'] = [<id-str>,<name-str>,<building>,<dep>,
+#       
+        # hospital: buildings, dept, room
+    
+#    shot['rooms'] = {}
     
     
     # Headers
@@ -470,8 +597,7 @@ def set_gui_strings(language):
     
     # Init GUI strings dictionary
     # TODO is it sane to include initialization here..? We might run set_gui_string from a change_language function..
-    global shot
-    shot = {}
+    #global shot
     shot['available_languages'] = []
     
     # Initialize string dictionary using a default language (English)
@@ -1065,7 +1191,7 @@ while True:             # Event Loop
         window['welcome_tab_username_infokey'].update(' ' * (len(shot['msg_user']) + 3 )) # blank space to write over
         window['welcome_tab_username_infoval'].update(' ' * (len('shot[username] here'))) # blank space to write over
         
-        # Set window title string
+        # Set <empty> window title string
         gui_window_title = 'Simple Hospital Outbreak Tracker'
 
                 
@@ -1103,6 +1229,9 @@ while True:             # Event Loop
         window.Finalize()
         status_message = 'Printing ..'
     elif event in shot['file_new'] or event in f"-{shot['icon_key_new']}-" or event in shot['icon_key_new']:
+        
+        
+        
         popup_some_error('File-> New not implemented yet.')
         outbreak_filename = None
     
@@ -1125,16 +1254,6 @@ while True:             # Event Loop
             window['welcome_tab_username_infokey'].update(shot['msg_user'])
             window['welcome_tab_username_infoval'].update('shot[username] here')
             
-    
-    # if outbreak_filename is None:
-        # # Reset welcome tab inputs
-        # window['welcome_tab_file_loaded_infobar'].update(shot['msg_no_file_loaded'])
-        # window['welcome_tab_file_loaded_ok'].update(f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}")
-        # window['welcome_tab_username_infokey'].update(' ' * (len(shot['msg_user']) + 3 )) # blank space to write over
-        # window['welcome_tab_username_infoval'].update(' ' * (len('shot[username] here'))) # blank space to write over
-        
-        # TODO other resets / clears here. E.g. redraw window using None as outbreak_filename
-        
 
     
     # Required for status bar
