@@ -1,13 +1,29 @@
 #!/usr/bin/env python3
 # SHOT - the Simple Hospital Outbreak Tracker, by Sigbjørn Smelror (c) 2020
-# SHOT provides a graphic depiction of the numner of outbreak cases by date of illness onset
-# License applies
+# SHOT provides a graphic depiction of the number of outbreak cases by date of illness onset
+# Copyright (C) 2020 Sigbjørn "sigg3" Smelror <git@sigg3.net>.
+#
+# SHOT is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3 of the License.
+#
+# SHOT is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+# URL: <https://www.gnu.org/licenses/old-licenses/gpl-3.0.txt>
+#
+# Submit issues and get updates at: <https://github.com/sigg3/shot>
+
 
 import PySimpleGUI as sg
 import pandas as pd
-import time, csv
+import time, csv, datetime
 import configparser
 from pathlib import Path
+
+
+# TODO not sure we need time, when 'datetime' fits our needs
 
 # Setup PySimpleGUI
 set_theme = 'SystemDefaultForReal'
@@ -38,9 +54,8 @@ shot_config_file = Path.cwd()/Path('settings.ini')
 default_language_setting = 'English'
 
 # TODO ConfigParser to set is_configured to True
-# Requrires just name, language/locale, hospital(s)
-#
-
+# Required config options are: user, language and unique-method (FNR, free-text string)
+# SHOT is built for Norwegian hospitals and relies on FNR up until version 1 at least.
     
 # digctionary
 # string(hospital) use function for strings?
@@ -52,12 +67,13 @@ def write_config_to(config_file):
     """
     Creates a settings.ini file using configparser
     Only used to set some permanent preferences for ease of use
+    And avoid having to re-do hospital information for each CSV file ..
     """
     
     config = configparser.ConfigParser()
     
     # Set the defaults
-    config['DEFAULT'] = {
+    config['OPTIONS'] = {
                         'user': shot['conf_user'],
                         'language': shot['conf_lang'],
                         'unique': shot['conf_uniq'],
@@ -109,19 +125,19 @@ def read_config_from(config_file):
     config = configparser.ConfigParser()
     config.read(str(config_file))
     
-    if 'DEFAULT' in config:
+    if 'OPTIONS' in config:
         
         # User is required for setting
-        my_user = config.get('DEFAULT', 'user', fallback=None) # NOICE
+        my_user = config.get('OPTIONS', 'user', fallback=None) # NOICE
         if my_user is None: return False
         
         # Language is required for setting
-        my_lang = config.get('DEFAULT', 'language', fallback='English')
+        my_lang = config.get('OPTIONS', 'language', fallback='English')
         if my_lang is None: return False
         
         # Optional values
-        my_hospital = config.get('DEFAULT', 'hospital', fallback=None)
-        my_unique = config.get('DEFAULT', 'unique', fallback='FNR')
+        my_hospital = config.get('OPTIONS', 'hospital', fallback=None)
+        my_unique = config.get('OPTIONS', 'unique', fallback='FNR')
     else:
         return False
     
@@ -134,8 +150,29 @@ def read_config_from(config_file):
     
     
     for sect in config.sections():
-        if sect in ('DEFAULT', 'RECENT'): continue
+        if sect in ('OPTIONS', 'RECENT'): continue
         print(sect)
+    
+    
+    # Load hospital(s) from settings.ini
+    # The shot['conf_hosp'] variable == hospital chosen in GUI (settings->Hospital or when creating new outbreak file)
+    #
+    # settings.ini takes precedence
+    # Please note that hospital(s) from settings.ini takes precedence
+    # This is to avoid conflicts where both settings.ini file and foreign Outbreak CSV file have changes in identical fields.
+    # In such cases, we must defer to conflict resolution, and see whether it's best to update either file or try and merge.
+    #
+    # Please note that we are only talking about SETTINGS here.
+    # The data in the outbreak CSV is the one that is shown ALWAYS, regardless of settings.ini file.
+    # The settings.ini is only intended as a time-saver, not having to re-create hospitals for each outbreak.
+    #
+    # Example
+    # >>> for sect in config.sections():
+	# if sect in ('OPTIONS', 'RECENT'): continue
+	# print(sect)
+
+    # Vestre Viken
+    # Oslo Universitetssykehus
     
     
     
@@ -359,6 +396,9 @@ def new_outbreak_file():
     Returns filename (or None 
     """
     
+    # First, set/get username
+    
+    
     # Get hospital info from config parser
     if shot['is_configured']:
         # TODO get hospital info
@@ -406,6 +446,15 @@ def open_outbreak_file():
     shot['headers'] = {}
     shot['headers']['generic'] = ['rec_type', 'col_1', 'col_2', 'col_3', 'col_4', 'col_5', 'col_6', 'col_7', 'col_8', 'col_9', 'col_10', 'col_11', 'col_12', 'col_13', 'col_14', 'col_15', 'col_16', 'col_17', 'col_18', 'col_19']
     
+    # TODO This ^ is ludicrious, get rid of it.
+    # The entire point of this excercise is to use csv.DictReader's ability to _set headers manually_, so we can assert one of the groups (below) based on rectyp column.
+    #
+    # e.g.
+    # example_reader = csv.DictReader(input_file, ['my', 'manually', 'asserted', 'headers'])
+    # for row in example_reader:
+    #   print(row['my'], row['asserted'], 'headers']) etc.
+    #
+    # because 'asserted' field might not be pertinent for this rec_type. etc.
     
     
     
@@ -461,6 +510,8 @@ def outbreak_file_sanity_pass(my_outbreak_file):
     #
     # |  read_text(self, encoding=None, errors=None)
     # |  Open the file in text mode, read it, and close the file.
+    # 
+    # TODO I am not sure whether to use open() or Path.open(). Must educate self.
     
     
     
@@ -1311,6 +1362,9 @@ window.read(timeout=1)
 
 
 # TODO if __name__ == '__main__' all of the runtime stuff
+
+# TODO rewrite event conditionals to use this format:
+#  if sect in ('OPTIONS', 'RECENT'):
 
 
 while True:             # Event Loop
