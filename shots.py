@@ -88,7 +88,44 @@ def write_config_to(config_file):
     # See if we have set any hospital(s) (Settings->Hospital)
     # These are ALL hospitals that we know of (in file and from earlier config reads)
     
-        
+    
+    # Any hospital in settings.ini requires 3 sections:
+    #
+    # [Hospital]
+    # name = Hospital
+    # ...
+    # buildings = HospitalBlds
+    # departments = HospitalDeps
+    #
+    # [HospitalBlds]
+    # ; buildings in the hospital 
+    #
+    # [HospitalDeps]
+    # ; departments in the hospital
+    #
+    # So Blds (buildings) and Deps (departments) are sub-sections
+    # The sections names are derived thus:
+    #
+    # >>> my_hospital = 'Madeup sykehus'
+    # >>> my_hospital.split()
+    # ['Madeup', 'sykehus']
+    # >>> my_hospital.split()[0]
+    # 'Madeup'
+    # >>> my_hospital.split()[0]+'Blds'
+    # 'MadeupBlds'
+    # >>> my_hospital.split()[0]+'Deps'
+    # 'MadeupDeps'
+    #
+    # If there are name conflicts, add len() to generate uglier but more unique name
+    # my_other_hosptital.split()[0]+'Deps'+str(len(my_other_hosptital))
+    #
+    # We want to keep it as human-readable as possible.
+    # This way of doing it allows us to add new section types.
+    
+    
+    
+    
+    
     
     
     # Finally, write to file
@@ -119,11 +156,12 @@ def write_config_to(config_file):
 def read_config_from(config_file):
     """
     Sets shot dict vars based on a .ini settings file in cwd
+    Sets up hospital dictionary to be used
     Returns bool (True iff configured and False if unconfigured)
     """
     
     config = configparser.ConfigParser()
-    config.read(str(config_file))
+    config.read(config_file) # takes both str and Path obj
     
     if 'OPTIONS' in config:
         
@@ -137,7 +175,8 @@ def read_config_from(config_file):
         
         # Optional values
         my_hospital = config.get('OPTIONS', 'hospital', fallback=None)
-        my_unique = config.get('OPTIONS', 'unique', fallback='FNR')
+        my_unique = config.get('OPTIONS', 'unique', fallback='FNR') # Sane default
+        
     else:
         return False
     
@@ -149,12 +188,153 @@ def read_config_from(config_file):
                 my_recent_files.append(config['RECENT'][x])
     
     
-    for sect in config.sections():
-        if sect in ('OPTIONS', 'RECENT'): continue
-        print(sect)
     
     
-    # Load hospital(s) from settings.ini
+    # Any hospital in settings.ini requires 3 sections:
+    #
+    # [Hospital]
+    # name = Hospital
+    # ...
+    # buildings = HospitalBlds
+    # departments = HospitalDeps
+    #
+    # [HospitalBlds]
+    # ; buildings in the hospital 
+    #
+    # [HospitalDeps]
+    # ; departments in the hospital
+    #
+    # So Blds (buildings) and Deps (departments) are sub-sections
+    # The sections names are derived thus:
+    #
+    # >>> my_hospital = 'Madeup sykehus'
+    # >>> my_hospital.split()
+    # ['Madeup', 'sykehus']
+    # >>> my_hospital.split()[0]
+    # 'Madeup'
+    # >>> my_hospital.split()[0]+'Blds'
+    # 'MadeupBlds'
+    # >>> my_hospital.split()[0]+'Deps'
+    # 'MadeupDeps'
+    # If there are name conflicts, add len() to generate uglier but more unique name
+    # my_other_hosptital.split()[0]+'Deps'+str(len(my_other_hosptital))
+    #
+    # We want to keep it as human-readable as possible.
+    # This way of doing it allows us to add new section types.
+
+    
+    
+    # Replaces all ranges in list (e.g. 
+
+    try:
+        print('checking hospital: ', end='')
+        hospital
+        print('hospital dict already loaded.')
+    except:
+        hospital = {}
+        print('hospital not set, creating it')
+    
+    
+    
+    
+    # Structure of hospital information imported from settings.ini file:
+    #
+    #   dict            var          var
+    # hospital['MadeUp Hospital'][_room_id_] = { 
+    #                                           'dep': 'maternity',
+    #                                           'bld': 'main',
+    #                                           'status': None # set to any value if room is contaminated or whatnot (planned for heatmap)
+    #                                           }
+    #
+    # In addition, there are generic lists
+    # hospital['MadeUp Hospital']['deps'][_department name_] = [ list of rooms in department ]
+    # hospital['MadeUp Hospital']['blds'][_building name_] = [ list of rooms in building ]
+    #
+    # hospital['MadeUp Hospital']['blds'] = dictionary containing all buildings in hospital
+    #
+    # hospital['MadeUp Hospital']['deps'].keys() == all departments in hospital
+    #  
+    #
+    #
+    # infection_in_building = hospital['MadeUp Hospital'][_room_id_].get('bld') # What building is ROOM_ID in?
+    #
+    # if hospital['MadeUp Hospital'][_room_id_]['dep'] == 'intensive_care':
+    #       
+    #   
+    # # if _room_id_ in hospital['MadeUp Hospital']['deps']['maternity']: 
+    #         # checks whether room_id is in list of rooms belonging to 'maternity' dept
+    #
+    #
+    # And these two overlapping:
+    # hospital['MadeUp Hospital']['blds'][_building_id_] = [ list of all rooms in building ]
+    # hospital['MadeUp Hospital']['deps'][_departmentid_] = [ list of all rooms in department ]
+    #
+    
+    subsect_list = [] # throwaway
+    number_of_hospitals_in_settings = 0
+    
+    for hospital_id in config.sections():
+        if hospital_id in ('OPTIONS', 'RECENT'): continue
+        if 'buildings' and 'departments' in config[hospital_id].keys():
+            # This is a hospital section, because it contains links to buildings and departments
+            number_of_hospitals_in_settings += 1
+            hospital[hospital_id] = {}
+            hospital[hospital_id]['bld'] = {}
+            hospital[hospital_id]['dep'] = {}
+            
+            # name of sections containing this hospital's buildings and departments
+            hosp_blds = config[hospital_id]['buildings']
+            hosp_deps = config[hospital_id]['departments'] 
+            
+            if hosp_blds and hosp_deps in config.sections():
+                for hosp_element in 'bld', 'dep':
+                    if hosp_element == 'bld':
+                        lookup_section = hosp_blds # name of settings.ini section containing this hospital's buildings
+                    else:
+                        lookup_section = hosp_deps
+                        
+                    for subsect, rooms in config[lookup_section].items():
+                        
+                        # hospital['hospital']['blds'][_name of bld_] = [] == room list of this specific building
+                        hospital[hospital_id][hosp_element][subsect] = []
+                        
+                        # iterate over comma-separated values in rooms string
+                        for room_id in rooms.split(sep=','):
+                            if room_id.isdigit():
+                                hospital[hospital_id][hosp_element][subsect].append(int(room_id)) # single room (not a range), add directly
+                                hospital[hospital_id][room_id] = {}
+                                hospital[hospital_id][room_id]['status'] = None
+                                hospital[hospital_id][room_id][hosp_element] = subsect # this will add both deps and buildings to room_id dict
+                            elif type(room_id) is str and '-' in room_id:
+                                try:
+                                    rep_beg = int(room_id.split(sep='-')[0])
+                                    rep_end = int(room_id.split(sep='-')[1])
+                                    for room_x in range(rep_beg, rep_end+1):
+                                        hospital[hospital_id][hosp_element][subsect].append(int(room_x)) # add single room derived from range
+                                        hospital[hospital_id][room_id] = {}
+                                        hospital[hospital_id][room_id]['status'] = None
+                                        hospital[hospital_id][room_id][hosp_element] = subsect
+                                except:
+                                    continue # in case there's garbage in the file, we won't add it
+    
+    
+    
+    # Now we need to set what kind of hospital __dict__ is relevant to shot __dict__
+    # in other words: what are my active settings here.
+    
+    if my_hospital is None and number_of_hospitals_in_settings == 1:
+        my_hospital = list(hospital.keys())[0]
+    elif my_hospital is None and number_of_hospitals_in_settings > 1:
+        popup_some_error('There are more than one hospital in settings.ini but none are active ..?')
+        # TODO
+    
+    
+    
+    
+    # Probably save to something like:
+    # shot[hospital][building] ??
+    
+ 
     # The shot['conf_hosp'] variable == hospital chosen in GUI (settings->Hospital or when creating new outbreak file)
     #
     # settings.ini takes precedence
@@ -320,6 +500,9 @@ def popup_new_outbreak():
                           ]
     
     new_outbreak = sg.Window(shot['file_new'], new_outbreak_layout)
+    
+    
+    
     # TODO register events here
 
 
@@ -366,8 +549,9 @@ def popup_new_department():
 
 def popup_new_room():
     """
-    Creates a new hospital room (child of hospital)
-    Rooms belongs physically to a building and logically to a department
+    Creates a new hospital room (child of all)
+    Rooms are first and foremost the smallest location info for any single patient.
+    Rooms belongs physically to a building and logically to a department.
     """
     pass
 
@@ -387,13 +571,31 @@ def popup_new_hospital():
     # Hospital name (string)
     # 
     
+
+def popup_select_hospital():
+    """
+    Simple drop-down style popup-box
+    RADIO [*] Use existing: [ drop down ]
+          [ ] Create new
+    """
+    if shot['is_configured']:
+        select_hospital = [
+                    [sg.T(shot['settings_language'])],
+                    [sg.Combo(shot['available_languages'], default_value=shot['settings_language_set'])],
+                    [sg.Button(shot['settings_language_change'])]
+                    ]
     
+    
+    do_change_language = sg.popup_yes_no(f"{ shot['settings_language_str']}: {shot['settings_language_set']}\n{shot['settings_language_change']}?", title=shot['settings_language'], auto_close=False)
+    if do_change_language == 'Yes': # TODO, change to language-button
+        lang_win= sg.Window(shot['settings_language'], layout=change_lang_win, margins=(2, 2), resizable=True, return_keyboard_events=True)
+          
     
 
 def new_outbreak_file():
     """
-    Runs the popup_new_outbreak
-    Returns filename (or None 
+    This is the main function for pressing New file.
+    Probably returns a bool? Not sure yet.
     """
     
     # First, set/get username
@@ -403,7 +605,11 @@ def new_outbreak_file():
     if shot['is_configured']:
         # TODO get hospital info
         # Note: this might be the wrong hospital, if so, user must change this in Settings->Hospital
-        pass
+        
+        if popup_select_hospital():
+            pass # TODO
+            
+        
     else:
         # TODO setup hospital info and 
         pass
