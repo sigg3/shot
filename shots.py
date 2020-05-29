@@ -87,6 +87,13 @@ def write_config_to(config_file):
     # See if we have any recent files stored on dict
     # TODO write RECENT sect
     
+    config['RECENT'] = {}
+    recent_counter = 0
+    for recent_file in shot['conf_recent']:
+        recent_counter += 1
+        testing['RECENT'][str(recent_counter)] = recent_file
+    
+    
     
     
     # See if we have set any hospital(s) (Settings->Hospital)
@@ -185,14 +192,15 @@ def read_config_from(config_file):
         return False
     
     
+    # Fetch recent files (if any)
     my_recent_files = []
     if 'RECENT' in config:
-        for x in range(1,6):
-            if x in config['RECENT']:
-                my_recent_files.append(config['RECENT'][x])
-    
-    
-    
+        for rec_file in config['RECENT'].values(): my_recent_files.append(rec_file)
+        
+        # if Path(rec_file).is_file() is possible here, but feels superfluous
+        # We can do that in an Open File type scenario
+
+        
     # Setup hospital dictionary (if it doesn't exist already)
     try:
         print('checking hospital dict: ', end='')
@@ -264,16 +272,20 @@ def read_config_from(config_file):
     
     number_of_hospitals_in_settings = 0
     
+   
+    
     def register_unique_room(input_room_id):
-        """ Sub function to make sure room IDs are unique. Many buildings in Norway have room 101 (first floor, second room..)."""
+        """
+        Sub function to make sure room IDs are unique.
+        Many buildings in Norway have room 101 (first floor, second room..), so we need something unique.
+        """
         hospital[hospital_id][hosp_element][subsect].append(int(input_room_id)) # single room (not a range), add directly        
         unique_room_id = (str(hospital_id), str(subsect), str(input_room_id))
-        unique_room_id = '+'.join(unique_room_id # creates something like: 'MadeUp Hospital+Main building+115'
+        unique_room_id = '+'.join(unique_room_id) # creates something like: 'MadeUp Hospital+Main building+115'
         hospital[hospital_id][unique_room_id] = {}
         hospital[hospital_id][unique_room_id]['status'] = None
         hospital[hospital_id][unique_room_id][hosp_element] = subsect # this will add both deps and buildings to room_id dict
     
-        
     
     for hospital_id in config.sections():
         if hospital_id in ('OPTIONS', 'RECENT'): continue
