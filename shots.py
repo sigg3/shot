@@ -24,6 +24,8 @@ from pathlib import Path
 
 
 # TODO not sure we need time, when 'datetime' fits our needs
+#   >>> datetime.datetime.now().isoformat().split(sep='T')
+#   ['2020-05-29', '13:20:44.426939']
 
 # Setup PySimpleGUI
 set_theme = 'SystemDefaultForReal'
@@ -50,8 +52,10 @@ sg.theme(set_theme)
 # Set sane defaults
 shot = {}
 outbreak_filename = None
-shot_config_file = Path.cwd()/Path('settings.ini')
+shot_config_file = Path.cwd()/Path('settings.ini') # TODO
 default_language_setting = 'English'
+hospital = {}
+
 
 # TODO ConfigParser to set is_configured to True
 # Required config options are: user, language and unique-method (FNR, free-text string)
@@ -189,55 +193,42 @@ def read_config_from(config_file):
     
     
     
-    
-    # Any hospital in settings.ini requires 3 sections:
-    #
-    # [Hospital]
-    # name = Hospital
-    # ...
-    # buildings = HospitalBlds
-    # departments = HospitalDeps
-    #
-    # [HospitalBlds]
-    # ; buildings in the hospital 
-    #
-    # [HospitalDeps]
-    # ; departments in the hospital
-    #
-    # So Blds (buildings) and Deps (departments) are sub-sections
-    # The sections names are derived thus:
-    #
-    # >>> my_hospital = 'Madeup sykehus'
-    # >>> my_hospital.split()
-    # ['Madeup', 'sykehus']
-    # >>> my_hospital.split()[0]
-    # 'Madeup'
-    # >>> my_hospital.split()[0]+'Blds'
-    # 'MadeupBlds'
-    # >>> my_hospital.split()[0]+'Deps'
-    # 'MadeupDeps'
-    # If there are name conflicts, add len() to generate uglier but more unique name
-    # my_other_hosptital.split()[0]+'Deps'+str(len(my_other_hosptital))
-    #
-    # We want to keep it as human-readable as possible.
-    # This way of doing it allows us to add new section types.
-
-    
-    
-    # Replaces all ranges in list (e.g. 
-
+    # Setup hospital dictionary (if it doesn't exist already)
     try:
-        print('checking hospital: ', end='')
+        print('checking hospital dict: ', end='')
         hospital
-        print('hospital dict already loaded.')
     except:
-        hospital = {}
-        print('hospital not set, creating it')
+        print('hospital not set, abort.')
+        popup_some_error('Hospital dict unset. This should never happen.')    
     
     
     
-    
-    # Structure of hospital information imported from settings.ini file:
+    # Structure of settings.ini file:
+    # [OPTIONS]
+    # user = my-fancy-username
+    # language = English
+    # hospital = MadeUp Hospital
+    # unique =FNR
+    #
+    # [RECENT]
+    # ...
+    #
+    # [MadeUp Hospital]
+    # name = MadeUp Hospital, blablala (can be longer, administrative or formal name)
+    # created     = <auto date>
+    # created-by  = <auto user>
+    # updated     = <auto date>
+    # updated-by  = <auto user>
+    # buildings   = name of settings.ini section containing buildings (also automatic)
+    # departments = name of settings.ini section containing departments (also automatic)
+    #
+    # [MadeUpBlds]
+    # ... key-value containing lists of rooms
+    #
+    # [MadeUpDeps]
+    # ... key-value containing lists of rooms
+    #
+    # Structure of hospital information imported from ^^ settings.ini file:
     #
     #   dict            var          var
     # hospital['MadeUp Hospital'][_room_id_] = { 
@@ -275,15 +266,23 @@ def read_config_from(config_file):
     for hospital_id in config.sections():
         if hospital_id in ('OPTIONS', 'RECENT'): continue
         if 'buildings' and 'departments' in config[hospital_id].keys():
-            # This is a hospital section, because it contains links to buildings and departments
-            number_of_hospitals_in_settings += 1
-            hospital[hospital_id] = {}
-
             # name of sections containing this hospital's buildings and departments
             hosp_blds = config[hospital_id]['buildings']
-            hosp_deps = config[hospital_id]['departments'] 
-            
+            hosp_deps = config[hospital_id]['departments']             
             if hosp_blds and hosp_deps in config.sections():
+                # This is true hospital, because it contains links to buildings and departments sections, and those sections exist
+                number_of_hospitals_in_settings += 1
+                hospital[hospital_id] = {}
+                
+                # Save some admin info
+                hospital[hospital_id]['info'] = {
+                                                'name': config[hospital_id]['name'],
+                                                'created': config[hospital_id]['created'],
+                                                'created-by': config[hospital_id]['created-by'],
+                                                'updated': config[hospital_id]['updated'],
+                                                'update-by': config[hospital_id]['updated-by']
+                                                }
+                # Then comes the nasty bits
                 for hosp_element in 'bld', 'dep':
                     if hosp_element == 'bld':
                         lookup_section = hosp_blds # name of settings.ini section containing this hospital's buildings
@@ -321,21 +320,28 @@ def read_config_from(config_file):
     
     
     # Activate a hospital in shot['coolstuff'] settings dict
-    
+    #
     # Set a fallback for my_hospital if empty
-    if my_hospital is None and number_of_hospitals_in_settings > 0:
-        my_hospital = list(hospital.keys())[0]
+    # storing shot['hospital_from_settings'] bool in order to avoid conflict with similarly named hospitals on file.
+    # Outbreak CSV files are data files and takes precedence. settings.ini is just for convenience.
+    # 
+    # Use these from [hospital] section in config.sections() to do versioning:
+    # created = 2020-05-28
+    # updated = 2020-05-29
+    # 
+    # If in doubt, we overwrite settings.ini with information from Outbreak CSV.
     
+    if my_hospital is None:
+        if number_of_hospitals_in_settings > 0:
+            my_hospital = list(hospital.keys())[0]
+            shot['hospital_from_settings'] = True
+        else:
+            shot['hospital_from_settings'] = False
+    else:
+        shot['hospital_from_settings'] = True
+
     
-    # Now we need to set what kind of hospital __dict__ is relevant to shot __dict__
-    # in other words: what are my active settings here. 
-    
-    
-    
-    # Probably save to something like:
-    # shot[hospital][building] ??
-    
- 
+   
     # The shot['conf_hosp'] variable == hospital chosen in GUI (settings->Hospital or when creating new outbreak file)
     #
     # settings.ini takes precedence
@@ -346,29 +352,21 @@ def read_config_from(config_file):
     # Please note that we are only talking about SETTINGS here.
     # The data in the outbreak CSV is the one that is shown ALWAYS, regardless of settings.ini file.
     # The settings.ini is only intended as a time-saver, not having to re-create hospitals for each outbreak.
-    #
-    # Example
-    # >>> for sect in config.sections():
-	# if sect in ('OPTIONS', 'RECENT'): continue
-	# print(sect)
-
-    # Vestre Viken
-    # Oslo Universitetssykehus
     
     
+    # Save to active config
+    if shot['hospital_from_settings']:
+        shot['hospital'] = hospital[my_hospital] # contains the data
+    else:
+        shot['hospital'] = None # user will be prompted to choose or create
     
-    
-    if my_hospital is not None:
-        pass
-    
-    # Set vars in config
-    shot['conf_user'] = my_user
-    shot['conf_lang'] = my_lang 
-    shot['conf_uniq'] = my_unique
-    shot['conf_hosp'] = my_hospital
-    shot['conf_recent'] = my_recent_files # list
+    # Finally, save simple values to dict
+    shot['conf_user'] = my_user     # string
+    shot['conf_lang'] = my_lang     # string
+    shot['conf_uniq'] = my_unique   # string
+    shot['conf_hosp'] = my_hospital # string
+    shot['conf_recent'] = my_recent_files # list object
         
-    
 
 
 # FUNCTIONS
