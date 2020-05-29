@@ -71,7 +71,7 @@ def write_config_to(config_file):
     """
     Creates a settings.ini file using configparser
     Only used to set some permanent preferences for ease of use
-    And avoid having to re-do hospital information for each CSV file ..
+    And avoid having to re-do e.g. hospital information for each CSV file ..
     """
     
     config = configparser.ConfigParser()
@@ -81,20 +81,47 @@ def write_config_to(config_file):
                         'user': shot['conf_user'],
                         'language': shot['conf_lang'],
                         'unique': shot['conf_uniq'],
-                        'hospital': shot['conf_hosp'] # This is hospital set
+                        'hospital': shot['conf_hosp'] # This is hospital set as string
                         }
     
-    # See if we have any recent files stored on dict
-    # TODO write RECENT sect
     
+    # Please beware, we have 3 levels
+    # hospital dict = contains all the hospital(s) currently known to SHOT (either read from outbreak CSV files and/or settings.ini)
+    # shot['conf_hosp'] = the name of hospital configured, as string
+    # shot['hospital'] = the current hospital configured, dictionary of dictionaries
+
+    
+    
+    # See if we have any recent files stored on dict
     config['RECENT'] = {}
     recent_counter = 0
     for recent_file in shot['conf_recent']:
         recent_counter += 1
-        testing['RECENT'][str(recent_counter)] = recent_file
+        config['RECENT'][str(recent_counter)] = recent_file
+        if recent_counter == shot['show_recent_files']: break # max
     
     
     
+    # See if we have any hospital(s) to store:
+    # These are ALL the hospitals we know of (including imports and from preceeding config reads)
+    
+    for hospital_id in hospital.keys():
+        
+        # Save general information
+        for infovar, infoval in hospital[hospital_id]['info'].items():
+            config[hospital_id][infovar] = infoval
+ 
+        
+        
+        
+        # TODO buildings, departments,
+        # Remember to create ranges where possible
+        
+        hosp_blds = config[hospital_id]['buildings']
+        hosp_deps = config[hospital_id]['departments']    
+
+        
+
     
     # See if we have set any hospital(s) (Settings->Hospital)
     # These are ALL hospitals that we know of (in file and from earlier config reads)
@@ -171,7 +198,7 @@ def read_config_from(config_file):
     Returns bool (True iff configured and False if unconfigured)
     """
     
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(allow_no_value=True)
     config.read(config_file) # takes both str and Path obj
     
     if 'OPTIONS' in config:
@@ -1251,6 +1278,14 @@ else:
     shot['conf_uniq'] = 'FNR'
     shot['conf_hosp'] = None
     shot['conf_recent'] = None
+
+
+try:
+    print('show recent files: ', end='')
+    shot['show_recent_files']
+except:
+    print('recent files set to 5')
+    shot['show_recent_files'] = 5
 
 
 # Set GUI dependining on config (if any)
