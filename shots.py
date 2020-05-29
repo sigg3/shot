@@ -223,6 +223,7 @@ def read_config_from(config_file):
     # departments = name of settings.ini section containing departments (also automatic)
     #
     # [MadeUpBlds]
+    # building 123: 200, 304, 400-600, 333, 23
     # ... key-value containing lists of rooms
     #
     # [MadeUpDeps]
@@ -263,6 +264,17 @@ def read_config_from(config_file):
     
     number_of_hospitals_in_settings = 0
     
+    def register_unique_room(input_room_id):
+        """ Sub function to make sure room IDs are unique. Many buildings in Norway have room 101 (first floor, second room..)."""
+        hospital[hospital_id][hosp_element][subsect].append(int(input_room_id)) # single room (not a range), add directly        
+        unique_room_id = (str(hospital_id), str(subsect), str(input_room_id))
+        unique_room_id = '+'.join(unique_room_id # creates something like: 'MadeUp Hospital+Main building+115'
+        hospital[hospital_id][unique_room_id] = {}
+        hospital[hospital_id][unique_room_id]['status'] = None
+        hospital[hospital_id][unique_room_id][hosp_element] = subsect # this will add both deps and buildings to room_id dict
+    
+        
+    
     for hospital_id in config.sections():
         if hospital_id in ('OPTIONS', 'RECENT'): continue
         if 'buildings' and 'departments' in config[hospital_id].keys():
@@ -300,19 +312,11 @@ def read_config_from(config_file):
                         # iterate over comma-separated values in rooms string from configparser
                         for room_id in rooms.split(sep=','):
                             if room_id.isdigit():
-                                hospital[hospital_id][hosp_element][subsect].append(int(room_id)) # single room (not a range), add directly
-                                hospital[hospital_id][room_id] = {}
-                                hospital[hospital_id][room_id]['status'] = None
-                                hospital[hospital_id][room_id][hosp_element] = subsect # this will add both deps and buildings to room_id dict
+                                register_unique_room(room_id) # single room (not a range), add directly   
                             elif type(room_id) is str and '-' in room_id:
                                 try:
-                                    rep_beg = int(room_id.split(sep='-')[0])
-                                    rep_end = int(room_id.split(sep='-')[1])
-                                    for room_x in range(rep_beg, rep_end+1):
-                                        hospital[hospital_id][hosp_element][subsect].append(int(room_x)) # add single room derived from range
-                                        hospital[hospital_id][room_id] = {}
-                                        hospital[hospital_id][room_id]['status'] = None
-                                        hospital[hospital_id][room_id][hosp_element] = subsect
+                                    rep_beg, rep_end = int(room_id.split(sep='-'))
+                                    for room_x in range(int(rep_beg), int(rep_end)+1): register_unique_room(room_x)  # add single room derived from range ^
                                 except:
                                     continue # in case there's garbage in the file, we won't add it
     
