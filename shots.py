@@ -270,7 +270,6 @@ def read_config_from(config_file):
     # hospital['MadeUp Hospital']['deps'][_departmentid_] = [ list of all rooms in department ]
     #
     
-    subsect_list = [] # throwaway
     number_of_hospitals_in_settings = 0
     
     for hospital_id in config.sections():
@@ -279,9 +278,7 @@ def read_config_from(config_file):
             # This is a hospital section, because it contains links to buildings and departments
             number_of_hospitals_in_settings += 1
             hospital[hospital_id] = {}
-            hospital[hospital_id]['bld'] = {}
-            hospital[hospital_id]['dep'] = {}
-            
+
             # name of sections containing this hospital's buildings and departments
             hosp_blds = config[hospital_id]['buildings']
             hosp_deps = config[hospital_id]['departments'] 
@@ -292,13 +289,16 @@ def read_config_from(config_file):
                         lookup_section = hosp_blds # name of settings.ini section containing this hospital's buildings
                     else:
                         lookup_section = hosp_deps
-                        
+                    
+                    # Create target dict 'bld' or 'dep' in hospital[hospital_id]
+                    hospital[hospital_id][hosp_element] = {}                    
+                    
                     for subsect, rooms in config[lookup_section].items():
                         
                         # hospital['hospital']['blds'][_name of bld_] = [] == room list of this specific building
                         hospital[hospital_id][hosp_element][subsect] = []
                         
-                        # iterate over comma-separated values in rooms string
+                        # iterate over comma-separated values in rooms string from configparser
                         for room_id in rooms.split(sep=','):
                             if room_id.isdigit():
                                 hospital[hospital_id][hosp_element][subsect].append(int(room_id)) # single room (not a range), add directly
@@ -319,15 +319,16 @@ def read_config_from(config_file):
     
     
     
-    # Now we need to set what kind of hospital __dict__ is relevant to shot __dict__
-    # in other words: what are my active settings here.
     
-    if my_hospital is None and number_of_hospitals_in_settings == 1:
+    # Activate a hospital in shot['coolstuff'] settings dict
+    
+    # Set a fallback for my_hospital if empty
+    if my_hospital is None and number_of_hospitals_in_settings > 0:
         my_hospital = list(hospital.keys())[0]
-    elif my_hospital is None and number_of_hospitals_in_settings > 1:
-        popup_some_error('There are more than one hospital in settings.ini but none are active ..?')
-        # TODO
     
+    
+    # Now we need to set what kind of hospital __dict__ is relevant to shot __dict__
+    # in other words: what are my active settings here. 
     
     
     
