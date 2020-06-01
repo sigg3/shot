@@ -105,28 +105,6 @@ def write_config_to(config_file):
     # See if we have any hospital(s) to store:
     # These are ALL the hospitals we know of (including imports and from preceeding config reads)
     
-    for hospital_id in hospital.keys():
-        
-        # Save general information
-        for infovar, infoval in hospital[hospital_id]['info'].items():
-            config[hospital_id][infovar] = infoval
- 
-        
-        
-        
-        # TODO buildings, departments,
-        # Remember to create ranges where possible
-        
-        hosp_blds = config[hospital_id]['buildings']
-        hosp_deps = config[hospital_id]['departments']    
-
-        
-
-    
-    # See if we have set any hospital(s) (Settings->Hospital)
-    # These are ALL hospitals that we know of (in file and from earlier config reads)
-    
-    
     # Any hospital in settings.ini requires 3 sections:
     #
     # [Hospital]
@@ -161,9 +139,66 @@ def write_config_to(config_file):
     # This way of doing it allows us to add new section types.
     
     
-    
-    
-    
+    for hospital_id in hospital.keys():
+        
+        # init config dict (for section)
+        config[hospital_id] = {}
+        
+        # Save general information
+        # (Does not contain buildings, departments links)
+        for infovar, infoval in hospital[hospital_id]['info'].items():
+            config[hospital_id][infovar] = infoval
+        
+        
+        # Hospital subsections (buildings, departments):
+        
+        for subsect in 'Blds', 'Deps':
+            if 'Blds' in subsect:
+                subsect_str = 'buildings'
+            else:
+                subsect_str = 'departments'
+            
+            # Standard subsec names
+            check_str = hospital[hospital_id]['name'].split()[0] + subsect
+            alt_check = check_str + str(len(hospital[hospital_id]['name']))
+            
+            # Configured subsec name 
+            subsect_name = hospital[hospital_id][subsect_str]
+
+            # Non-standard name might be on purpose (to avoid dupliate)
+            # Note: we should not do any error correction here, it makes more sense to do duplicate avoidance in Create New Hospital scenarios..
+            if subsect_name != check_str and subsect_name != alt_check:
+                print(f"Warning: using non-standard '{subsect_str}' var: {subsect_name}")
+            
+            # Write configured hospital/dept string to hospital section in config file
+            config[hospital_id][subsect_str] = subsect_name
+            
+            # Create section (dict) in config file
+            config[subsect_str] = {}
+            
+            # Populate section with room var name (array identifier) and corresponding rooms (values)
+            for array_identifier, room_array in hospital[hospital_id][subsect.lower()].items():
+                
+                # Pack room array into human-readable ranges before saving
+                config[subsect_str][array_identifier] = []
+                
+                # use int-list in case configparser or shot changes room number to str
+                rooms_asint = [ int(room) for room in room_array ]
+                rooms_asint = list(set(rooms_asint)) # only unique values needed
+                rooms_asint.sort() # but they should be sorted (human-readabiity)
+                
+                for disroom in rooms_asint:
+                    if disroom+1 in rooms_asint:
+                        if disroom-1 in rooms_asint:
+                            pass
+                        else:
+                            array_beg = disroom
+                    elif disroom-1 in rooms_asint:
+                        config[subsect_str][array_identifier].append(f'{array_beg}-{disroom}')
+                    else:
+                        config[subsect_str][array_identifier].append(disroom)
+            
+
     
     
     # Finally, write to file
@@ -344,6 +379,7 @@ def read_config_from(config_file):
                     hospital[hospital_id][hosp_element] = {}                    
                     
                     for subsect, rooms in config[lookup_section].items():
+                        # Note: 'subsect' is poor choice of name. It's not really a subscet but the 'var' in: var = foo, bar, fizz ...
                         
                         # hospital['hospital']['blds'][_name of bld_] = [] == room list of this specific building
                         hospital[hospital_id][hosp_element][subsect] = []
