@@ -34,12 +34,6 @@ sg.theme(set_theme)
 
 #fontSize = 16
 
-# sha512 for hashing passwords (not stored)
-#from hashlib import sha512
-
-# deprecated
-#import rockikz_crypt
-
 # Dictionary
 # FNR == Norwegian SSN
 # Ref: https://www.skatteetaten.no/person/folkeregister/fodsel-og-navnevalg/barn-fodt-i-norge/fodselsnummer/
@@ -52,7 +46,7 @@ sg.theme(set_theme)
 # Set sane defaults
 shot = {}
 outbreak_filename = None
-shot_config_file = Path.cwd()/Path('settings.ini') # TODO
+shot_config_file = Path.cwd()/Path('settings.ini') # TODO: find out how to do this XDG + windows safe
 default_language_setting = 'English'
 hospital = {}
 
@@ -72,6 +66,7 @@ def write_config_to(config_file):
     Creates a settings.ini file using configparser
     Only used to set some permanent preferences for ease of use
     And avoid having to re-do e.g. hospital information for each CSV file ..
+    This function must not mess with current, active settings (except from reading them)
     """
     
     config = configparser.ConfigParser()
@@ -151,7 +146,6 @@ def write_config_to(config_file):
         
         
         # Hospital subsections (buildings, departments):
-        
         for subsect in 'Blds', 'Deps':
             if 'Blds' in subsect:
                 subsect_str = 'buildings'
@@ -208,21 +202,21 @@ def write_config_to(config_file):
     
 
     # >>> import configparser
-# >>> config = configparser.ConfigParser()
-# >>> config['DEFAULT'] = {'ServerAliveInterval': '45',
-# ...                      'Compression': 'yes',
-# ...                      'CompressionLevel': '9'}
-# >>> config['bitbucket.org'] = {}
-# >>> config['bitbucket.org']['User'] = 'hg'
-# >>> config['topsecret.server.com'] = {}
-# >>> topsecret = config['topsecret.server.com']
-# >>> topsecret['Port'] = '50022'     # mutates the parser
-# >>> topsecret['ForwardX11'] = 'no'  # same here
-# >>> config['DEFAULT']['ForwardX11'] = 'yes'
-# >>> with open('example.ini', 'w') as configfile:
-# ...   config.write(configfile)
-    
-    
+    # >>> config = configparser.ConfigParser()
+    # >>> config['DEFAULT'] = {'ServerAliveInterval': '45',
+    # ...                      'Compression': 'yes',
+    # ...                      'CompressionLevel': '9'}
+    # >>> config['bitbucket.org'] = {}
+    # >>> config['bitbucket.org']['User'] = 'hg'
+    # >>> config['topsecret.server.com'] = {}
+    # >>> topsecret = config['topsecret.server.com']
+    # >>> topsecret['Port'] = '50022'     # mutates the parser
+    # >>> topsecret['ForwardX11'] = 'no'  # same here
+    # >>> config['DEFAULT']['ForwardX11'] = 'yes'
+    # >>> with open('example.ini', 'w') as configfile:
+    # ...   config.write(configfile)
+        
+
 
 
 # Read Configuration file (settings.ini)
@@ -454,10 +448,14 @@ def is_fnr(fnr):
     """
     Determine whetner input 'fnr' is true FNR or not. Return bool
     If the patient does not have a valid FNR, the age and gender fields will be required.
+    Does not work for historical persons (born before 1902).
     """
     assert type(fnr) == str, 'FNR not a string in is_fnr()'
     if fnr.isdigit() and len(fnr) == 11:
-        return True
+        # right type and length
+        if fnr[0] <= 1 and int(fnr[0:2]) <= 31 and int(fnr[2:4]) <= 12:
+            # right datetypes (first 6 digits ok)
+            return True
     return False
 
 
@@ -473,21 +471,27 @@ def nationality_from_fnr(fnr):
     """
     If the person has a true FNR, it's a rather safe assumption that s/he has a Norwegian passport.
     """
-    if is_fnr(fnr):
+    if is_fnr(fnr):  # TODO: rewrite
         return 'Norwegian'
     return None
 
 def age_from_fnr(fnr):
     """
     Fetch age from 5th and 6th FNR digits.
-    Note: For people born between 2000-2039, the last 3 FNR digits are 999-500
+    Note: For people born between 2000-2039, the 3 FNR 'individual' digits are 999-500
     Note: Oldest person alive at time of writing was born in 1902, so skipping earlier.
     """
-    if is_fnr(fnr):
-        year_now = time.localtime()[0]
+    if is_fnr(fnr): # TODO: rewrite
+#        year_now = time.localtime()[0]
+#        year_now = int(datetime.datetime.now().isoformat().split(sep='T')[0].split(sep='-')[0])  # using datetime in case we remove time module
+        year_now = int(datetime.datetime.now().strftime('%Y')) # a bit shorter
         year_then = int(fnr[4:6])
-        if int(fnr[-3:]) == 999 or ( int(fnr[-3:]) >= 0 and int(fnr[-3:]) <= 500 ):
-            year_then = f'20{year_then}'
+        individual = int(fnr[-5:-2])
+        if individual == 999 or ( individual >= 0 and individual <= 500 ):
+            if year_then > int(str(year_now)[-2:]): # future
+                year_then = f'19{year_then}' # can't be born in the future, so set YOB in 20th century
+            else:
+                year_then = f'20{year_then}' # It's a guess
         else:
             year_then = f'19{year_then}'
         return year_now - int(year_then)
@@ -499,7 +503,7 @@ def gender_from_fnr(fnr):
     """
     Returns gender string from 'individnummer' from fnr. Even are female and odds are male.
     """
-    if is_fnr:
+    if is_fnr: # TODO: rewrite
         if (int(fnr[8:9]) % 2) == 0:
             return 'female'
         else:
