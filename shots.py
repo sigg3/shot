@@ -39,6 +39,11 @@ sg.theme(set_theme)
 # Ref: https://www.skatteetaten.no/person/folkeregister/fodsel-og-navnevalg/barn-fodt-i-norge/fodselsnummer/
 
 
+# TODO
+# swap print to console with logging
+# import logging
+# logging.basicConfig(filename='shots_debug.log', level=logging.DEBUG, format=' %(asctime)s - %(levelname)s - %(message)s')
+
 # TODO (low priority)
 # Check if there are cli arguments
 # Argument 1 is file name. If it exists, load it (open); if not, create it (new).
@@ -59,6 +64,46 @@ hospital = {}
 # string(hospital) use function for strings?
 
 # Tabbed design (check audio rec)
+
+
+
+    
+# Any hospital in settings.ini requires 3 sections:
+#
+# [Hospital]
+# name = Hospital
+# ...
+# buildings = HospitalBlds
+# departments = HospitalDeps
+#
+# [HospitalBlds]
+# ; buildings in the hospital 
+#
+# [HospitalDeps]
+# ; departments in the hospital
+#
+# So Blds (buildings) and Deps (departments) are sub-sections
+# The sections names are derived thus:
+#
+# >>> my_hospital = 'Madeup sykehus'
+# >>> my_hospital.split()
+# ['Madeup', 'sykehus']
+# >>> my_hospital.split()[0]
+# 'Madeup'
+# >>> my_hospital.split()[0]+'Blds'
+# 'MadeupBlds'
+# >>> my_hospital.split()[0]+'Deps'
+# 'MadeupDeps'
+#
+# If there are name conflicts, add len() to generate uglier but more unique name
+# my_other_hosptital.split()[0]+'Deps'+str(len(my_other_hosptital))
+#
+# We want to keep it as human-readable as possible.
+# This way of doing it allows us to add new section types.
+    
+
+
+
 
 # Write Configuration file (settings.ini)
 def write_config_to(config_file):
@@ -84,7 +129,6 @@ def write_config_to(config_file):
     # hospital dict = contains all the hospital(s) currently known to SHOT (either read from outbreak CSV files and/or settings.ini)
     # shot['conf_hosp'] = the name of hospital configured, as string
     # shot['hospital'] = the current hospital configured, dictionary of dictionaries
-
     
     
     # See if we have any recent files stored on dict
@@ -98,42 +142,6 @@ def write_config_to(config_file):
     
     
     # See if we have any hospital(s) to store:
-    # These are ALL the hospitals we know of (including imports and from preceeding config reads)
-    
-    # Any hospital in settings.ini requires 3 sections:
-    #
-    # [Hospital]
-    # name = Hospital
-    # ...
-    # buildings = HospitalBlds
-    # departments = HospitalDeps
-    #
-    # [HospitalBlds]
-    # ; buildings in the hospital 
-    #
-    # [HospitalDeps]
-    # ; departments in the hospital
-    #
-    # So Blds (buildings) and Deps (departments) are sub-sections
-    # The sections names are derived thus:
-    #
-    # >>> my_hospital = 'Madeup sykehus'
-    # >>> my_hospital.split()
-    # ['Madeup', 'sykehus']
-    # >>> my_hospital.split()[0]
-    # 'Madeup'
-    # >>> my_hospital.split()[0]+'Blds'
-    # 'MadeupBlds'
-    # >>> my_hospital.split()[0]+'Deps'
-    # 'MadeupDeps'
-    #
-    # If there are name conflicts, add len() to generate uglier but more unique name
-    # my_other_hosptital.split()[0]+'Deps'+str(len(my_other_hosptital))
-    #
-    # We want to keep it as human-readable as possible.
-    # This way of doing it allows us to add new section types.
-    
-    
     for hospital_id in hospital.keys():
         
         # init config dict (for section)
@@ -181,6 +189,8 @@ def write_config_to(config_file):
                 rooms_asint = list(set(rooms_asint)) # only unique values needed
                 rooms_asint.sort() # but they should be sorted (human-readabiity)
                 
+                # Append rooms to corresponding "owner" (department or building or both)
+                # Note that we write contiguous rooms as ranges, e.g. 112-120, for easier editing.
                 for disroom in rooms_asint:
                     if disroom+1 in rooms_asint:
                         if disroom-1 in rooms_asint:
@@ -188,9 +198,10 @@ def write_config_to(config_file):
                         else:
                             array_beg = disroom
                     elif disroom-1 in rooms_asint:
-                        config[subsect_str][array_identifier].append(f'{array_beg}-{disroom}')
+                        # since we have sorted the list first, we can assume that any array_beg is set already
+                        config[subsect_str][array_identifier].append(f'{array_beg}-{disroom}') # append range
                     else:
-                        config[subsect_str][array_identifier].append(disroom)
+                        config[subsect_str][array_identifier].append(disroom) # append individual
             
 
     
@@ -671,8 +682,55 @@ def popup_select_hospital():
     do_change_language = sg.popup_yes_no(f"{ shot['settings_language_str']}: {shot['settings_language_set']}\n{shot['settings_language_change']}?", title=shot['settings_language'], auto_close=False)
     if do_change_language == 'Yes': # TODO, change to language-button
         lang_win= sg.Window(shot['settings_language'], layout=change_lang_win, margins=(2, 2), resizable=True, return_keyboard_events=True)
-          
+
+
+def popup_change_username():
+    """
+    This functions displays a popup prompting the user to change/set a user name (string).
+    It sets the variable shot['username'] if succesful.
+    """
     
+    try:
+        uinput_uname_default = shot['username']
+    except:
+        uinput_uname_default = ''
+    
+    user_input_username = [
+                          [sg.T(shot['msg_user_str_purpose'])],
+                          [sg.T(f"{shot['msg_user']}: "), sg.InputText(uinput_uname_default, key='username_popup_inputfield', size=(40,1))],
+                          [sg.Button(shot['msg_change']), sg.Button(shot['msg_cancel'])]
+                          ]
+    
+    do_add_user_name_string = sg.Window(shot['msg_user_change'], layout=user_input_username, margins=(2, 2), resizable=False, return_keyboard_events=True)
+    
+    while True:
+        uchname_event, uchname_vals = do_add_user_name_string.read()
+        if uchname_event is None:
+            break
+        elif uchname_event == shot['msg_cancel']:
+            break
+        elif uchname_event == shot['msg_change']:
+            if uchname_vals['username_popup_inputfield'] == '':
+                pass
+            else:
+                shot['username'] = str(uchname_vals['username_popup_inputfield'])
+                print(f"user set: {shot['username']}") # debug
+            
+            break
+    do_add_user_name_string.close()
+    
+
+
+def get_username_from_config_or_read():
+    try:
+        shot['username'] # is set
+    except:
+        try:
+            shot['conf_user'] # is configured but not set
+            shot['username'] = shot['conf_user'] # is set
+        except:
+            # TODO: add visible warning (popup)
+            popup_change_username()
 
 def new_outbreak_file():
     """
@@ -681,10 +739,11 @@ def new_outbreak_file():
     """
     
     # First, set/get username
-    
+    get_username_from_config_or_read()
     
     # Get hospital info from config parser
     if shot['is_configured']:
+        
         # TODO get hospital info
         # Note: this might be the wrong hospital, if so, user must change this in Settings->Hospital
         
@@ -694,7 +753,9 @@ def new_outbreak_file():
         
     else:
         # TODO setup hospital info and 
-        pass
+        get_username_from_config_or_read()
+        
+            
     
     pass
 
@@ -893,7 +954,7 @@ def tab_welcome(outbreak_filename):
         welcome_tab_filename = outbreak_filename
         welcome_tab_loadfile = shot['msg_file_loaded_ok']
         welcome_tab_user_key = f"{shot['msg_user']}: "
-        welcome_tab_username = 'user-name-string-here'
+        welcome_tab_username = 'user-name-string-here' # TODO: change to shot['username']
         
     
     # TODO
@@ -1077,6 +1138,7 @@ def set_gui_strings(language):
     shot['settings_language_str'] = 'Your current language is'
     shot['settings_language_set'] = 'English'
     shot['settings_language_change'] = 'Change language'
+    shot['settings_user_change'] = 'Change username'
 
     # Settings > Hospital
     shot['settings_hospital'] = 'Hospital'
@@ -1125,14 +1187,18 @@ def set_gui_strings(language):
     shot['tip_epicurve'] = 'Plot the data from the linelist'
     shot['tip_g-chart'] = 'Plot data from linelist in g-chart'
     
-    # Some general warnings and errors
+    # Some general text headers, warnings and errors
     shot['msg_user'] = 'User'
     shot['msg_user_unset'] = 'User not set'
     shot['msg_user_change'] = 'Change User'
+    shot['msg_user_str_purpose'] = 'The user name is required for logging file authors end editors.'
     shot['msg_no_file_loaded'] = 'No outbreak file loaded.'
     shot['msg_file_loaded_ok'] = 'Outbreak file ready.'
     shot['msg_no_file_tip'] = 'In order to proceed, please create a new outbreak or opening an existing outbreak file.'
     shot['msg_there_has_been_error'] = 'There has been an error!'
+
+    shot['msg_change'] = 'Change'
+    shot['msg_cancel'] = 'Cancel'
     
     shot['err_wrong_data_format'] = 'Incorrect file type. Does not seem to contain the right data.'
     shot['err_incorrect_delim'] = 'Incorrect file type. Incorrect delimiter detected.'
@@ -1169,6 +1235,7 @@ def set_gui_strings(language):
         shot['settings_language_str'] = 'Gjeldende språkinnstilling er'
         shot['settings_language'] = 'Endre språk'
         shot['settings_language_change'] = 'Endre språk'
+        shot['settings_user_change'] = 'Endre brukernavn'
         
         shot['settings_hospital'] = 'Sykehus'
         shot['settings_hospital_manage'] = 'Administrere sykehus'
@@ -1216,12 +1283,16 @@ def set_gui_strings(language):
         # Some general warnings and errors
         shot['msg_user'] = 'Bruker'
         shot['msg_user_unset'] = 'Mangler bruker'
-        shot['msg_change'] = 'Endre'
+        shot['msg_user_change'] = 'Endre bruker'
+        shot['msg_user_str_purpose'] = 'The user name is required for logging file authors end editors.'
+        
         shot['msg_no_file_loaded'] = 'Ingen utbruddsfil er valgt.'
         shot['msg_file_loaded_ok'] = 'Utbruddsfil klar.'
         shot['msg_no_file_tip'] = 'Vennligst lag en ny utbruddsfil eller åpne en eksisterende for å fortsette.'
         shot['msg_there_has_been_error'] = 'Det har skjedd en feil.'
         
+        shot['msg_change'] = 'Endre'
+        shot['msg_cancel'] = 'Avbryt'
             
         shot['err_wrong_data_format'] = 'Feil filtype. Filen har ikke riktig type data.'
         shot['err_incorrect_delim'] = 'Feil filtype. Filen har ikke riktig delimiter.'
@@ -1397,7 +1468,7 @@ assert icon_bkg is not None, 'icon_bkg variable set to None (must not happen)'
 menu_layout = [
                [shot['file_file'], [shot['file_new'], shot['file_open'], shot['file_save'], shot['file_save_as'], shot['file_close'], shot['file_import'], shot['file_export_sheet'], shot['file_export_image'], shot['file_print'], shot['file_exit']]],
                [shot['stats_stats'], [shot['stats_epicurve'], shot['stats_gchart'], shot['stats_compare'], shot['stats_filtering']]],
-               [shot['settings_settings'], [shot['settings_encryption'], shot['settings_hospital'], [shot['settings_hospital_manage'], shot['settings_hospital_rooms']], shot['settings_language']]],
+               [shot['settings_settings'], [shot['settings_encryption'], shot['settings_hospital'], [shot['settings_hospital_manage'], shot['settings_hospital_rooms']], shot['settings_language'], shot['settings_user_change']]],
                [shot['help_help'], [shot['help_help_help'], shot['help_online'], shot['help_license'], shot['help_participate'], shot['help_about']]]
                ]
 
@@ -1706,6 +1777,8 @@ while True:             # Event Loop
         break
     elif event in shot['settings_language']:
         popup_language()
+    elif event in shot['settings_user_change']:
+        popup_change_username()
     elif event in shot['stats_epicurve']:
         shot['tab']['show']['epicurve'] = True # TODO live update
     elif event in shot['icon_key_print'] or event in shot['file_print']:
