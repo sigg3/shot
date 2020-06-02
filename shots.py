@@ -348,7 +348,7 @@ def read_config_from(config_file):
         """
         hospital[hospital_id][hosp_element][subsect].append(int(input_room_id)) # single room (not a range), add directly        
         unique_room_id = (str(hospital_id), str(subsect), str(input_room_id))
-        unique_room_id = '+'.join(unique_room_id) # creates something like: 'MadeUp Hospital+Main building+115'
+        unique_room_id = '_'.join(unique_room_id) # creates something like: 'MadeUp Hospital_Main building_115'
         hospital[hospital_id][unique_room_id] = {}
         hospital[hospital_id][unique_room_id]['status'] = None
         hospital[hospital_id][unique_room_id][hosp_element] = subsect # this will add both deps and buildings to room_id dict
@@ -684,53 +684,82 @@ def popup_select_hospital():
         lang_win= sg.Window(shot['settings_language'], layout=change_lang_win, margins=(2, 2), resizable=True, return_keyboard_events=True)
 
 
-def popup_change_username():
+def popup_uinput_single_string(query_type):
     """
-    This functions displays a popup prompting the user to change/set a user name (string).
-    It sets the variable shot['username'] if succesful.
+    This is a generic function for displaying a popup asking for a single string.
+    The required keyword determines its contents and target(s).
+    The function sets a value. It returns True if popup was shown, False if it failed (for debugging).
     """
     
-    try:
-        uinput_uname_default = shot['username']
-    except:
-        uinput_uname_default = ''
+    # Set default fallback
+    run_this_popup = False
     
-    user_input_username = [
-                          [sg.T(shot['msg_user_str_purpose'])],
-                          [sg.T(f"{shot['msg_user']}: "), sg.InputText(uinput_uname_default, key='username_popup_inputfield', size=(40,1))],
-                          [sg.Button(shot['msg_change']), sg.Button(shot['msg_cancel'])]
-                          ]
+    if 'username' in query_type:
+        uinput_popup_title = shot['msg_user_change']
+        uinput_popup_purpose = shot['msg_user_str_purpose']
+        uinput_popup_pretext = shot['msg_user']
+        uinput_popup_keyname = 'username_popup_inputfield' # any unique string we can check
+        uinput_popup_button_doit = shot['msg_change']
+        uinput_popup_button_cancel = shot['msg_cancel']
+        
+        # set default text shown (if set)
+        try:
+            uinput_popup_defaults = shot['username']
+        except:
+            uinput_popup_defaults = '' # in case var not set
+        
+        # Finally, set to run
+        run_this_popup = True
+    else:
+        # Put e.g. hospital name, any single-line input query here
+        pass
     
-    do_add_user_name_string = sg.Window(shot['msg_user_change'], layout=user_input_username, margins=(2, 2), resizable=False, return_keyboard_events=True)
-    
-    while True:
-        uchname_event, uchname_vals = do_add_user_name_string.read()
-        if uchname_event is None:
-            break
-        elif uchname_event == shot['msg_cancel']:
-            break
-        elif uchname_event == shot['msg_change']:
-            if uchname_vals['username_popup_inputfield'] == '':
-                pass
-            else:
-                shot['username'] = str(uchname_vals['username_popup_inputfield'])
-                print(f"user set: {shot['username']}") # debug
+    if run_this_popup:
+        uinput_popup_popup_layout = [
+                                    [sg.T(uinput_popup_purpose)],
+                                    [sg.T(f"{uinput_popup_pretext}: "), sg.InputText(uinput_popup_defaults, key= uinput_popup_keyname, size=(50,1))],
+                                    [sg.Button(uinput_popup_button_doit), sg.Button(uinput_popup_button_cancel)]
+                                    ]
+        
+        do_run_this_popup = sg.Window(uinput_popup_title, layout=uinput_popup_popup_layout, margins=(2, 2), resizable=False, return_keyboard_events=True)
+        
+        while True:
+            uchname_event, uchname_vals = do_run_this_popup.read()
             
-            break
-    do_add_user_name_string.close()
+            if uchname_event is None:
+                break
+            elif uchname_event == uinput_popup_button_cancel:
+                break
+            elif uchname_event == uinput_popup_button_doit:
+                if uchname_vals[uinput_popup_keyname] == '':
+                    pass
+                else:
+                    if 'username' in query_type:
+                        shot['username'] = str(uchname_vals[uinput_popup_keyname])
+                        print(f"user set: {shot['username']}") # debug
+                    else:
+                        pass # do the others here
+                break
+        do_run_this_popup.close()
     
+    return run_this_popup
 
 
 def get_username_from_config_or_read():
+    """
+    Simple function to make sure that shot['username'] is set and not None
+    """
     try:
         shot['username'] # is set
+        if shot['username'] is None: popup_uinput_single_string('username')
     except:
         try:
             shot['conf_user'] # is configured but not set
             shot['username'] = shot['conf_user'] # is set
+            if shot['username'] is None: popup_uinput_single_string('username')
         except:
             # TODO: add visible warning (popup)
-            popup_change_username()
+            popup_uinput_single_string('username')
 
 def new_outbreak_file():
     """
@@ -752,12 +781,13 @@ def new_outbreak_file():
             
         
     else:
-        # TODO setup hospital info and 
-        get_username_from_config_or_read()
+        # We have user name
+        #
         
-            
+        # TODO setup hospital info and  
+        
     
-    pass
+        pass
 
     
 def open_outbreak_file():
@@ -1778,7 +1808,7 @@ while True:             # Event Loop
     elif event in shot['settings_language']:
         popup_language()
     elif event in shot['settings_user_change']:
-        popup_change_username()
+        popup_uinput_single_string('username')
     elif event in shot['stats_epicurve']:
         shot['tab']['show']['epicurve'] = True # TODO live update
     elif event in shot['icon_key_print'] or event in shot['file_print']:
