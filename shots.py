@@ -368,10 +368,11 @@ def read_config_from(config_file):
                 # Save some admin info
                 hospital[hospital_id]['info'] = {
                                                 'name': config[hospital_id]['name'],
+                                                'full': config[hospital_id]['fullname'],
                                                 'created': config[hospital_id]['created'],
                                                 'created-by': config[hospital_id]['created-by'],
                                                 'updated': config[hospital_id]['updated'],
-                                                'update-by': config[hospital_id]['updated-by']
+                                                'updated-by': config[hospital_id]['updated-by']
                                                 }
                 # Then comes the nasty bits
                 for hosp_element in 'bld', 'dep':
@@ -426,10 +427,10 @@ def read_config_from(config_file):
 
     
    
-    # The shot['conf_hosp'] variable == hospital chosen in GUI (settings->Hospital or when creating new outbreak file)
+    # The shot['conf_hosp'] variable == hospital chosen in GUI (settings->Hospital or when creating new outbreak file), i.e. name as string
     #
     # settings.ini takes precedence
-    # Please note that hospital(s) from settings.ini takes precedence
+    # Please note that hospital(s) from settings.ini takes precedence (if active settings are default, e.g. None types)
     # This is to avoid conflicts where both settings.ini file and foreign Outbreak CSV file have changes in identical fields.
     # In such cases, we must defer to conflict resolution, and see whether it's best to update either file or try and merge.
     #
@@ -546,33 +547,11 @@ def get_status_line(**kwargs): # TODO this does not work ..
 
 
 # Show error popup
-def popup_some_error(show_str):
-#    sg.popup_error(str(show_str))
-#    sg.popup_ok()
-    
-    
-    
-    sg.popup(f"{shot['msg_there_has_been_error']}\n\n{str(show_str)}", title=shot['msg_there_has_been_error'], icon=shot['icon_error'])
-    
-    
-    # Popup(args=*<1 or N object>,
-    # title=None,
-    # button_color=None,
-    # background_color=None,
-    # text_color=None,
-    # button_type=0,
-    # auto_close=False,
-    # auto_close_duration=None,
-    # custom_text=(None, None),
-    # non_blocking=False,
-    # icon=None,
-    # line_width=None,
-    # font=None,
-    # no_titlebar=False,
-    # grab_anywhere=False,
-    # keep_on_top=False,
-    # location=(None, None))
-    
+def popup_some_error(show_str):    
+    sg.popup(f"{shot['msg_there_has_been_error']}\n\n{str(show_str)}", title=shot['msg_there_has_been_error'], icon=shot['icon_error'], keep_on_top=True)
+
+
+
 def popup_new_outbreak():
     
     new_outbreak_info = [
@@ -650,8 +629,9 @@ def popup_new_room():
 
 
 
-def popup_new_hospital():
+def popup_new_hospital(returntofunc):
     """
+    requires returntofunc (str or None)
     Creates a new hospital (and a new hospital class entry in config)
     A hospital contains buildings, departments and rooms (which can be physically connected)
     This is a work-in-progress but might provide capability to display infection heatmap onto "map"
@@ -661,30 +641,261 @@ def popup_new_hospital():
     # Then the new one will automatically be the selected on (in settings.ini file)
     # See configparser functions for more info
     
-    # Hospital name (string)
-    # 
+    # buttons
+    button_doit = 'OK'
+    button_cancel = shot['msg_cancel']
     
+    # Initial view
+    # Popup asking for hospital name and full (legal) name:
+    name_new_hospital_win = [
+                            [sg.T(f"{shot['msg_hospital_create']}")],
+                            [sg.T(' ')],
+                            [sg.Frame(layout=[
+                                            [sg.InputText('', key='popup_new_hospital_name', size=(50,1))],
+                                            [sg.T(f"{shot['msg_hospital_name_purpose']}")]],
+                                            title=shot['msg_hospital_name'])],
+                            [sg.T(' ')],                
+                            [sg.Frame(layout=[
+                                            [sg.InputText('', key='popup_new_hospital_fullname', size=(50,1))],
+                                            [sg.T(f"{shot['msg_hospital_full_name_purpose']}")]],
+                                            title=shot['msg_hospital_full_name'])],
+                            [sg.T(' ')],
+                            [sg.Button(button_doit), sg.Button(button_cancel)]
+                            ]
+    name_new_hospital = sg.Window(shot['msg_hospital_create'], layout=name_new_hospital_win, margins=(2, 2), resizable=True, return_keyboard_events=True, keep_on_top=True)
+    
+    proceed_to_create_hospital = False
+    there_was_an_error = None
+    
+    while True:
+        name_hosp_event, name_hosp_vals = name_new_hospital.read()
+        print(f'name_hosp_event={name_hosp_event}') # debug
+        print(f'name_hosp_vals={name_hosp_vals}') # debug
+        if name_hosp_event is None:
+            break
+        elif name_hosp_event == button_cancel:
+            break
+        elif name_hosp_event == button_doit:
+            if name_hosp_vals['popup_new_hospital_name'] is None or name_hosp_vals['popup_new_hospital_name'] == '':
+                there_was_an_error = 'name'
+                break
+            elif name_hosp_vals['popup_new_hospital_fullname'] is None or name_hosp_vals['popup_new_hospital_fullname'] == '':
+                there_was_an_error = 'fullname'
+                break
+            else:
+                print('do it') # debug
+                proceed_to_create_hospital = True # only if vals are set correctly (and not '')
+                break
+    
+    name_new_hospital.close()
+
+
+    if proceed_to_create_hospital:
+        # This is the "main" new hospital window
+        # If this is successful, we can _create_ the hospital dicts and update settings
+        
+        popup_show_hospital_info(name=name_hosp_vals['popup_new_hospital_name'], fullname=name_hosp_vals['popup_new_hospital_fullname'], create_new=True)
+        try:
+            if shot['conf_hosp'] == name_hosp_vals['popup_new_hospital_name']:
+                returntofunc = None
+            else:
+                returntofunc = 'return_to_select_hospital'
+        except:
+            returntofunc = 'return_to_select_hospital'
+    else:
+        if there_was_an_error == 'name':
+            popup_some_error(f"{shot['msg_missing']}: {shot['msg_hospital_name']}")
+        elif there_was_an_error == 'fullname':
+            popup_some_error(f"{shot['msg_missing']}: {shot['msg_hospital_full_name']}")
+        
+    
+    # Return to previous popup if user errors or hit cancel
+    if returntofunc == 'return_to_select_hospital':
+        popup_select_hospital()
+
+
+
+def popup_show_hospital_info(**kwargs):
+    """
+    Shows hospital info of input hospital name (str) or configured shot['conf_hosp']
+    arguments: name=<str>, fullname=<str>, action=show/create <str>, returnto=<str>
+    works completely fine without any supplied arguments too :)
+    """
+    # Parse args (or set defaults)
+    create_new = kwargs.get('create_new', False) # this is a "create new hospital" scenario
+    
+    if not create_new:
+        # Show existing hospital using configured settings
+        try:
+            shot['conf_hosp']
+            shot['hospital']
+            hospital_name = kwargs.get('name', shot['conf_hosp'])
+            hospital_fullname = kwargs.get('fullname', shot['hospital']['info']['fullname'])
+            hospital_info_title = f"Hospital info - {hospital_name}"
+            button_doit = 'OK'
+            button_other = shot['msg_change']
+            button_cancel = shot['msg_cancel']
+            created_tstamp = shot['hospital']['info']['created']
+            created_user = shot['hospital']['info']['created-by']
+            updated_tstamp = shot['hospital']['info']['updated']
+            updated_user = shot['hospital']['info']['updated-by']
+            hospital_departments = shot['hospital']['dep']
+            hospital_buildings = shot['hospital']['bld']
+            
+            
+            do_go_on = True
+        except:
+            popup_some_error(shot['msg_hospital_no_hospitals'])
+            do_go_on = False
+    else:
+        # Create new hospital scenario
+        hospital_info_title = f"{shot['msg_hospital_create']} - {hospital_name}"
+        button_doit = shot['msg_hospital_create']
+        button_cancel = shot['msg_cancel']
+        do_go_on = True
+        # Set author, creation date
+        try:
+            created_user = shot['username']
+        except:
+            # Must prompt for user
+            popup_uinput_single_string('username')
+            try:
+                created_user = shot['username']
+            except:
+                popup_some_error('Could not set username :(')
+                do_go_on = False
+
+        created_tstamp = datetime.datetime.now().isoformat()
+        updated_tstamp = created_tstamp
+        updated_user = created_user
+        hospital_departments = {}
+        hospital_buildings = {}
+        hospital_rooms = {}
+    
+    
+    # do_go_on workaround
+    # This is lazy, but there's no point in building and displaying a window that won't work
+    if do_go_on:
+        
+        if create_new:
+            button_line = [sg.Button(button_doit), sg.Button(button_cancel)]
+        else:
+            button_line = [sg.Button(button_doit), sg.Button(button_other), sg.Button(button_cancel)]
+       
+       
+       
+        # Data for tables are e.g.
+        # list(hospital['my_hosp']['bld'])
+        # 
+        # and
+        # 
+        # len(hospital['my_hosp']['bld'])
+        
+        hospital_info_win = [
+                            [sg.T(f"{hospital_info_title}")],
+                            [sg.T(f"{shot['msg_hospital_purpose']}\n{shot['msg_hospital_overview']}\n\n")],
+                            
+                            # See this for table info: http://pythonic.zoomquiet.top/data/20180919092225/index.html # TODO TODO TODO
+                            
+                            [sg.InputText('', key='popup_new_hospital_name', size=(50,1))],
+                            [sg.T(f"{shot['msg_hospital_name_purpose']}\n\n\n{shot['msg_hospital_full_name']}:")],
+                            [sg.InputText('', key='popup_new_hospital_fullname', size=(50,1))],
+                            [sg.T(f"{shot['msg_hospital_full_name_purpose']}")],
+                            button_line
+                            ]
+        
+        
+        # TODO    
 
 def popup_select_hospital():
     """
     Simple drop-down style popup-box
     RADIO [*] Use existing: [ drop down ]
           [ ] Create new
+          
+    Returns string containing name of selected hospital (or None) # This might be false info # TODO
     """
+    
+    # buttons
+    button_doit = 'OK' # this is okay here
+    button_cancel = shot['msg_cancel'] 
+    
+    # Default Return value
+    selected_hospital = None
+    
+    # default to no config
+    list_of_available_hospitals = [] # default to empty list
+    default_selection = None
+    use_existing_default = False
+    disable_existing = True
+    
     if shot['is_configured']:
-        select_hospital = [
-                    [sg.T(shot['settings_language'])],
-                    [sg.Combo(shot['available_languages'], default_value=shot['settings_language_set'])],
-                    [sg.Button(shot['settings_language_change'])]
-                    ]
+        try:
+            shot['hospital']
+            default_selection = shot['hospital']
+            if len(default_selection) > 0:
+                use_existing_default = True
+                disable_existing = False
+                list_of_available_hospitals = list(hospital.keys()) # all hospitals known to us
+            else:
+                default_selection = None # Cannot allow user to use incomplete hospital
+        except:
+            pass   
+    
+    if use_existing_default:
+        use_createnew_default = False
+        hosp_select_filler_text = shot['msg_hospital_overview']
+        
+    else:
+        use_createnew_default = True
+        hosp_select_filler_text = shot['msg_hospital_no_hospitals']
+    
+    select_hospital_win = [
+                          [sg.T(f"{shot['msg_hospital_select']}\n{hosp_select_filler_text}\n")],
+                          [sg.Radio('From existing:', "input_use_existing_hospital", key='hospital_selector_useexisting', default=use_existing_default, disabled=disable_existing),  sg.Combo(list_of_available_hospitals, key='hospital_selected_from_existing', default_value=default_selection, disabled=disable_existing)],
+                          [sg.Radio('Create new', "input_create_new_hospital", key='hospital_selector_donew', default=use_createnew_default)],
+                          [sg.Button(button_doit), sg.Button(button_cancel)]
+                          ]
+    select_hospital = sg.Window('Select hospital', layout=select_hospital_win, margins=(2, 2), resizable=True, return_keyboard_events=True, keep_on_top=True)
     
     
-    do_change_language = sg.popup_yes_no(f"{ shot['settings_language_str']}: {shot['settings_language_set']}\n{shot['settings_language_change']}?", title=shot['settings_language'], auto_close=False)
-    if do_change_language == 'Yes': # TODO, change to language-button
-        lang_win= sg.Window(shot['settings_language'], layout=change_lang_win, margins=(2, 2), resizable=True, return_keyboard_events=True)
+    while True:
+        selhosp_event, selhosp_vals = select_hospital.read()
+        print(f'selhosp_event={selhosp_event}')
+        print(f'selhosp_vals={selhosp_vals}')        
+        if selhosp_event is None:
+            break
+        elif selhosp_event == button_cancel:
+            break
+        elif selhosp_event == button_doit:
+            if selhosp_vals['hospital_selector_donew']:
+                selected_hospital = 'create_new'
+                break
+            elif selhosp_vals['hospital_selector_useexisting']:
+                # TODO find what value was selected from combo box # TODO TODO
+                # Check whether the selected value was different than the one configured
+                try:
+                    selhosp_vals['hospital_selected_from_existing']
+                    # TODO
+                    print('using an existing hospital') # TODO
+                except:
+                    continue # bad input
+            break
+    
+    select_hospital.close()
+    
+    # TODO Not sure if this belongs here or elsewhere in the workflow
+    # Returns string with name of hospital (or None)
+    if selected_hospital is None:
+        pass
+    elif selected_hospital == 'create_new':
+        popup_new_hospital('return_to_select_hospital')
+    else:
+        pass
+        # TODO
+    
 
-
-def popup_uinput_single_string(query_type):
+def popup_uinput_single_string(popup_query_type):
     """
     This is a generic function for displaying a popup asking for a single string.
     The required keyword determines its contents and target(s).
@@ -694,7 +905,7 @@ def popup_uinput_single_string(query_type):
     # Set default fallback
     run_this_popup = False
     
-    if 'username' in query_type:
+    if 'username' in popup_query_type:
         uinput_popup_title = shot['msg_user_change']
         uinput_popup_purpose = shot['msg_user_str_purpose']
         uinput_popup_pretext = shot['msg_user']
@@ -710,9 +921,24 @@ def popup_uinput_single_string(query_type):
         
         # Finally, set to run
         run_this_popup = True
+    elif 'hospital_name' in popup_query_type:
+        
+        # TODO fill out correct strings
+        uinput_popup_title = shot['msg_user_change']
+        uinput_popup_purpose = shot['msg_user_str_purpose']
+        uinput_popup_pretext = shot['msg_user']
+        uinput_popup_keyname = 'hospitalstr_popup_inputfield' # any unique string we can check
+        uinput_popup_button_doit = shot['msg_change']
+        uinput_popup_button_cancel = shot['msg_cancel']
+        
+        try:
+            uinput_popup_defaults = shot['hospital']
+        except:
+            uinput_popup_defaults = '' # in case var not set
+        
+        
     else:
-        # Put e.g. hospital name, any single-line input query here
-        pass
+        popup_some_error('Called popup_uinput_single_string() without recognized popup_query_type.')
     
     if run_this_popup:
         uinput_popup_popup_layout = [
@@ -722,7 +948,6 @@ def popup_uinput_single_string(query_type):
                                     ]
         
         do_run_this_popup = sg.Window(uinput_popup_title, layout=uinput_popup_popup_layout, margins=(2, 2), resizable=False, return_keyboard_events=True)
-        
         while True:
             uchname_event, uchname_vals = do_run_this_popup.read()
             
@@ -734,14 +959,15 @@ def popup_uinput_single_string(query_type):
                 if uchname_vals[uinput_popup_keyname] == '':
                     pass
                 else:
-                    if 'username' in query_type:
+                    if 'username' in popup_query_type:
                         shot['username'] = str(uchname_vals[uinput_popup_keyname])
-                        print(f"user set: {shot['username']}") # debug
+                        print(f"shot['username'] set to {shot['username']}") # debug
                     else:
                         pass # do the others here
                 break
         do_run_this_popup.close()
     
+    # This is probably meaningless
     return run_this_popup
 
 
@@ -760,11 +986,13 @@ def get_username_from_config_or_read():
         except:
             # TODO: add visible warning (popup)
             popup_uinput_single_string('username')
+    
 
 def new_outbreak_file():
     """
     This is the main function for pressing New file.
     Probably returns a bool? Not sure yet.
+    This is a workflow (see workflow1.png)
     """
     
     # First, set/get username
@@ -776,6 +1004,8 @@ def new_outbreak_file():
         # TODO get hospital info
         # Note: this might be the wrong hospital, if so, user must change this in Settings->Hospital
         
+        
+        
         if popup_select_hospital():
             pass # TODO
             
@@ -783,11 +1013,9 @@ def new_outbreak_file():
     else:
         # We have user name
         #
-        
+        pass # TODO
         # TODO setup hospital info and  
         
-    
-        pass
 
     
 def open_outbreak_file():
@@ -1124,14 +1352,6 @@ def set_gui_strings(language):
     """
     This function sets the visible strings for the GUI according to internal language preference.
     Translation is done by appending this function with an elif clause appropriate for your language.
-    
-    Use ISO-3166 2-letter country code: 
-    # Usage 
-    # set_gui_strings() # Use default (English)
-    # set_gui_strings('NO') # Sets Norwegian
-    # set_gui_strings('EN') # Sets English
-    
-    For reference: https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Decoding_table
     """
     
     # Init GUI strings dictionary
@@ -1172,7 +1392,7 @@ def set_gui_strings(language):
 
     # Settings > Hospital
     shot['settings_hospital'] = 'Hospital'
-    shot['settings_hospital_manage'] = 'Manage hospitals'
+    shot['settings_hospital_manage'] = 'Manage hospital'
     shot['settings_hospital_rooms'] = 'Room editor'
 
     # Help menu
@@ -1217,24 +1437,54 @@ def set_gui_strings(language):
     shot['tip_epicurve'] = 'Plot the data from the linelist'
     shot['tip_g-chart'] = 'Plot data from linelist in g-chart'
     
-    # Some general text headers, warnings and errors
+    # General application strings
+    shot['msg_change'] = 'Change'
+    shot['msg_cancel'] = 'Cancel'
+    shot['msg_missing'] = 'Missing' # For errors, e.g. Missing: <some input>
+    shot['msg_show'] = 'Show'
+    shot['msg_input_created'] = 'Created'        # followed by timestamp
+    shot['msg_input_created-by']  = 'Created by' # followed by username
+    shot['msg_input_changed'] = 'Changed'        # followed by timestamp
+    shot['msg_input_changed-by'] = 'Changed by'  # followed by username
+
+    # User related strings
     shot['msg_user'] = 'User'
     shot['msg_user_unset'] = 'User not set'
     shot['msg_user_change'] = 'Change User'
     shot['msg_user_str_purpose'] = 'The user name is required for logging file authors end editors.'
+    
+    # File related strings
     shot['msg_no_file_loaded'] = 'No outbreak file loaded.'
     shot['msg_file_loaded_ok'] = 'Outbreak file ready.'
-    shot['msg_no_file_tip'] = 'In order to proceed, please create a new outbreak or opening an existing outbreak file.'
+    shot['msg_no_file_tip'] = 'In order to proceed, please create a new outbreak or open an existing outbreak file.'
     shot['msg_there_has_been_error'] = 'There has been an error!'
-
-    shot['msg_change'] = 'Change'
-    shot['msg_cancel'] = 'Cancel'
-    
     shot['err_wrong_data_format'] = 'Incorrect file type. Does not seem to contain the right data.'
     shot['err_incorrect_delim'] = 'Incorrect file type. Incorrect delimiter detected.'
     shot['err_no_headers'] = 'Incorrect file type. File did not contain any headers..'
     shot['err_weird_data_string'] = 'Weird. Cannot convert input file string to Path object.'
     shot['err_input_notafile'] = 'Incorrect input. Input is not a file.'
+    
+    # Hospital admin strings
+    shot['msg_hospital_no_hospitals'] = 'There are no hospitals configured.'
+    shot['msg_hospital_create'] = 'Create new hospital'
+    shot['msg_hospital_purpose'] = 'Registering outbreaks in terms of rooms, departments and buildings simplify tracking and heatmap creation.'
+    shot['msg_hospital_overview'] = 'A hospital contains buildings, departments and rooms.'
+    shot['msg_hospital_select'] = 'Select hospital'
+    shot['msg_hospital_name'] = 'Hospital name'
+    shot['msg_hospital_name_purpose'] = 'The commonly used (and short) name of the hospital'
+    shot['msg_hospital_full_name'] = 'Legal and administrative name'
+    shot['msg_hospital_full_name_purpose'] = 'Full legal and administrative name of the hospital (for printed output)'
+    shot['msg_hospital_department'] = 'Department' # unit ..?
+    shot['msg_hospital_departments'] = 'Departments'
+    shot['msg_hospital_building'] = 'Building'
+    shot['msg_hospital_buildings'] = 'Buildings'
+    shot['msg_hospital_room'] = 'Room'
+    shot['msg_hospital_rooms'] = 'Rooms'
+    
+    # Medical strings
+    # TODO
+    
+    
     
     # Set translated language string
     if language == 'English':
@@ -1498,7 +1748,7 @@ assert icon_bkg is not None, 'icon_bkg variable set to None (must not happen)'
 menu_layout = [
                [shot['file_file'], [shot['file_new'], shot['file_open'], shot['file_save'], shot['file_save_as'], shot['file_close'], shot['file_import'], shot['file_export_sheet'], shot['file_export_image'], shot['file_print'], shot['file_exit']]],
                [shot['stats_stats'], [shot['stats_epicurve'], shot['stats_gchart'], shot['stats_compare'], shot['stats_filtering']]],
-               [shot['settings_settings'], [shot['settings_encryption'], shot['settings_hospital'], [shot['settings_hospital_manage'], shot['settings_hospital_rooms']], shot['settings_language'], shot['settings_user_change']]],
+               [shot['settings_settings'], [shot['settings_encryption'], shot['settings_hospital'], [shot['settings_hospital_manage'], shot['settings_hospital_rooms'], 'testing_stuff'], shot['settings_language'], shot['settings_user_change']]], # TODO remove 'testing_stuff'
                [shot['help_help'], [shot['help_help_help'], shot['help_online'], shot['help_license'], shot['help_participate'], shot['help_about']]]
                ]
 
@@ -1809,6 +2059,8 @@ while True:             # Event Loop
         popup_language()
     elif event in shot['settings_user_change']:
         popup_uinput_single_string('username')
+    elif event in 'testing_stuff':
+        popup_select_hospital()
     elif event in shot['stats_epicurve']:
         shot['tab']['show']['epicurve'] = True # TODO live update
     elif event in shot['icon_key_print'] or event in shot['file_print']:
