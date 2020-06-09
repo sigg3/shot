@@ -979,20 +979,23 @@ def popup_show_hospital_info(**kwargs):
     # shot['msg_hospital_building_add'] = 'Add building'       
        
         
-        if number_of_departments == 0 and number_of_buildings == 0:
-            list_rooms_line = [sg.T(f"{shot['msg_hospital_rooms_req']}", size=tsize_spac, justification='center')]
+        if number_of_departments == 0 or number_of_buildings == 0:
+            list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
         elif rooms_in_total == 0:
-            list_rooms_line = [sg.T(f"{shot['msg_hospital_no_rooms']}", size=(tsize_long+tsize_short,1)), sg.Button(shot['msg_hospital_rooms_add'], key='addme_som_rooms_pls')]
+            list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
         else:
-            pass # Show some room stats and a button to open the room editor (will close this window)
+            list_rooms_line = ' '
         
+        
+        # TODO
+        #list_rooms_line = [sg.T(f"{shot['msg_hospital_no_rooms']}", size=(tsize_long+tsize_short,1)), sg.Button(shot['msg_hospital_rooms_add'], key='addme_som_rooms_pls')]
         
         
         # Disable/enable View Buildings button
         view_blds_disabled = False if number_of_rooms_in_buildings > 0 else True
         view_deps_disabled = False if number_of_rooms_in_departments > 0 else True    
         view_room_disabled = False if (number_of_rooms_in_departments > 0) or (number_of_rooms_in_buildings > 0) else True
-        
+        add_rooms_disabled = False if (number_of_departments > 0) and (number_of_buildings > 0) else True
         
         # Buildings
         table_buildings = [
@@ -1006,6 +1009,9 @@ def popup_show_hospital_info(**kwargs):
                             [sg.T(f"{shot['msg_hospital_rooms_coverage']}:", size=tsize_titl, key='dep_line_title'), sg.T(room_coverage[1], size=tsize_cont, key='dep_line_conts'), sg.Button(shot['msg_hospital_department_add'], size=tsize_titl), sg.Button(shot['msg_hospital_departments'], key='dep_view_list', size=tsize_titl, disabled=view_deps_disabled)]
                             ]
         
+        # Rooms
+        table_rooms = [[sg.T(' ', size=tsize_cont), sg.Button(shot['msg_hospital_rooms_add'], size=tsize_titl, key='add_rooms_button', disabled=add_rooms_disabled), sg.Button('Room Editor', size=tsize_titl, key='view_rooms_button', disabled=view_room_disabled), sg.T(' ', size=tsize_titl)]] # TODO weird thing with sizes here...? Or not?
+        
         
         # Administrative / log
         table_adminfo = [
@@ -1018,14 +1024,15 @@ def popup_show_hospital_info(**kwargs):
         
         hospital_info_win = [
                             [sg.T(hospital_name)], # perhaps make this big and bold?
-                            [sg.T(f"{shot['msg_hospital_purpose']}\n{shot['msg_hospital_overview']}\n\n")],
+                            [sg.T(f"{shot['msg_hospital_purpose']}\n{shot['msg_hospital_overview']}")],
+                            [sg.T(list_rooms_line, key='room_conditional_text')],
                             [sg.Frame(layout=[[sg.Col(table_adminfo)]], title=f"{shot['msg_log']}")],
                             [sg.T(' ')],
                             [sg.Frame(layout=[[sg.Col(table_buildings)]], title=f"{shot['msg_hospital_buildings']}")],
                             [sg.T(' ')],
                             [sg.Frame(layout=[[sg.Col(table_departments)]], title=f"{shot['msg_hospital_departments']}")],
                             [sg.T(' ')],
-                            list_rooms_line,
+                            [sg.Frame(layout=[[sg.Col(table_rooms)]], title=f"{shot['msg_hospital_rooms']}")],
                             [sg.T(' ')],
                             button_line
                             ]
@@ -1038,13 +1045,16 @@ def popup_show_hospital_info(**kwargs):
 #            if subseq:
             # Disable/enable View Buildings list button
             manage_hospital_win['bld_view_list'].Update(disabled=view_blds_disabled)
-            manage_hospital_win['dep_view_list'].Update(disabled=view_deps_disabled)     
+            manage_hospital_win['dep_view_list'].Update(disabled=view_deps_disabled)    
+            manage_hospital_win['view_rooms_button'].Update(disabled=view_room_disabled)
+            manage_hospital_win['add_rooms_button'].Update(disabled=add_rooms_disabled)
+             
             
             # Debug       
             print(f"view_blds_disabled = {view_blds_disabled}")
             print(f"view_deps_disabled = {view_deps_disabled}")
-            print(f"hospital_buildings = {hospital_buildings}")
-            print(f"hospital_departments = {hospital_departments}")
+            print(f"hospital_buildings = {len(hospital_buildings)}")
+            print(f"hospital_departments = {len(hospital_departments)}")
             
             # Window read
             hosp_info_event, hosp_info_vals = manage_hospital_win.read()
@@ -1124,19 +1134,30 @@ def popup_show_hospital_info(**kwargs):
             # Update calculations
             if rooms_in_total == 0:
                 room_coverage = room_coverage = [ '0.0%', '0.0%' ]
-                view_room_disabled = True
             else:
                 room_coverage = [ f"{(x/rooms_in_total)*100:0.1f}%" for x in [ rooms_in_buildings, rooms_in_departments] ]
-                view_room_disabled = False if (number_of_rooms_in_departments > 0) or (number_of_rooms_in_buildings > 0) else True
             
+            # Set view and add_rooms button "visibility" (deactivated or activated)
+            view_room_disabled = False if (number_of_rooms_in_departments > 0) or (number_of_rooms_in_buildings > 0) else True
+            add_rooms_disabled = False if (number_of_departments > 0) and (number_of_buildings > 0) else True
+            
+            # And the view {item} buttons ..
             view_blds_disabled = True if number_of_buildings == 0 else False
             view_deps_disabled = True if number_of_departments == 0 else False
-                
-            #number_of_buildings = len(hospital_buildings)
 
+            # Set helpful tip at the top (removed if all is well)
+            # TODO test if this should be in bold or different color.
+            if number_of_departments == 0 or number_of_buildings == 0:
+                list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
+            elif rooms_in_total == 0:
+                list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
+            else:
+                list_rooms_line = ' '
+                
             
             # Update GUI stringsand fields
             manage_hospital_win.Finalize
+            manage_hospital_win['room_conditional_text'].update(value=list_rooms_line)
             manage_hospital_win['show_number_of_deps'].update(value=number_of_departments)
             manage_hospital_win['show_number_of_blds'].update(value=number_of_buildings)
             
