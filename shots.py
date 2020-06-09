@@ -21,11 +21,34 @@ import pandas as pd
 import time, csv, datetime
 import configparser
 from pathlib import Path
+#import copy
+
+
+# TO PONDER
+# Probably need copy to do deepcopy of shots[] to compare settings
+# So we can do original_settings = copy.deepcopy(shot) when shot is "fresh"
+# However, this is state tracking...... perhaps leave it to a class?
+# 
+# Compare 2 dicts:
+# if original_settings == current_settings:
+#    pass
+# else:
+#    save current settings
+#    deepcopy current_settings to original_settings
+#
+#    TO answer "WHAT DIFFERED" is a cumbersome task. This goes a long way:
+#    stuff_in_common = {k: v for k, v in my_first.items() if k in my_second.keys() and v in my_second.values()}
+#    dicts_diff = {k: my_second[k] for k in set(my_second) - set(stuff_in_common)} # only takes care of keys ..
+#
+#    but it is imprecise on account of the v in values(), so we would have to resort to greater for loop if that was unsuccesful.
+#    HOWEVER, it could be a huge timesaver ..
+# 
 
 
 # TODO not sure we need time, when 'datetime' fits our needs
 #   >>> datetime.datetime.now().isoformat().split(sep='T')
 #   ['2020-05-29', '13:20:44.426939']
+# Later: we probably do not need time.
 
 # Setup PySimpleGUI
 set_theme = 'SystemDefaultForReal'
@@ -366,13 +389,15 @@ def read_config_from(config_file):
                 hospital[hospital_id] = {}
                 
                 # Save some admin info
+                # This will be stored in e.g. shot['hospital']['info']['created-by'] (for the currently active hospital)
                 hospital[hospital_id]['info'] = {
                                                 'name': config[hospital_id]['name'],
                                                 'full': config[hospital_id]['fullname'],
                                                 'created': config[hospital_id]['created'],
                                                 'created-by': config[hospital_id]['created-by'],
                                                 'updated': config[hospital_id]['updated'],
-                                                'updated-by': config[hospital_id]['updated-by']
+                                                'updated-by': config[hospital_id]['updated-by'],
+                                                'version': config[hospital_id]['version']
                                                 }
                 # Then comes the nasty bits
                 for hosp_element in 'bld', 'dep':
@@ -548,7 +573,7 @@ def get_status_line(**kwargs): # TODO this does not work ..
 
 # Show error popup
 def popup_some_error(show_str):    
-    sg.popup(f"{shot['msg_there_has_been_error']}\n\n{str(show_str)}", title=shot['msg_there_has_been_error'], icon=shot['icon_error'], keep_on_top=True)
+    sg.popup(f"{shot['msg_there_has_been_error']}\n\n{str(show_str)}\n", title=shot['msg_there_has_been_error'], icon=shot['icon_error'], keep_on_top=True)
 
 
 
@@ -649,24 +674,24 @@ def popup_new_hospital(returntofunc):
     # Popup asking for hospital name and full (legal) name:
     name_new_hospital_win = [
                             [sg.T(f"{shot['msg_hospital_create']}")],
-                            [sg.T(' ')],
                             [sg.Frame(layout=[
                                             [sg.InputText('', key='popup_new_hospital_name', size=(50,1))],
                                             [sg.T(f"{shot['msg_hospital_name_purpose']}")]],
                                             title=shot['msg_hospital_name'])],
                             [sg.T(' ')],                
                             [sg.Frame(layout=[
-                                            [sg.InputText('', key='popup_new_hospital_fullname', size=(50,1))],
+                                            [sg.InputText('', key='popup_new_hospital_fullname', size=(50,1), enable_events=True)],
                                             [sg.T(f"{shot['msg_hospital_full_name_purpose']}")]],
                                             title=shot['msg_hospital_full_name'])],
                             [sg.T(' ')],
                             [sg.Button(button_doit), sg.Button(button_cancel)]
                             ]
-    name_new_hospital = sg.Window(shot['msg_hospital_create'], layout=name_new_hospital_win, margins=(2, 2), resizable=True, return_keyboard_events=True, keep_on_top=True)
+    name_new_hospital = sg.Window(shot['msg_hospital_create'], layout=name_new_hospital_win, margins=(2, 2), resizable=False, return_keyboard_events=True, keep_on_top=True, finalize=True)
     
     proceed_to_create_hospital = False
     there_was_an_error = None
     
+
     while True:
         name_hosp_event, name_hosp_vals = name_new_hospital.read()
         print(f'name_hosp_event={name_hosp_event}') # debug
@@ -675,6 +700,14 @@ def popup_new_hospital(returntofunc):
             break
         elif name_hosp_event == button_cancel:
             break
+        elif name_hosp_event == 'Tab:23':
+            if name_hosp_vals['popup_new_hospital_name'] is None or name_hosp_vals['popup_new_hospital_name'] == '':
+                pass
+            else:
+                # copy input from name field into full name field (quality of life fix)
+                #name_new_hospital.Finalize
+                if name_hosp_vals['popup_new_hospital_fullname'] is None or name_hosp_vals['popup_new_hospital_fullname'] == '':
+                    name_new_hospital['popup_new_hospital_fullname'].update(name_hosp_vals['popup_new_hospital_name'])
         elif name_hosp_event == button_doit:
             if name_hosp_vals['popup_new_hospital_name'] is None or name_hosp_vals['popup_new_hospital_name'] == '':
                 there_was_an_error = 'name'
@@ -686,6 +719,7 @@ def popup_new_hospital(returntofunc):
                 print('do it') # debug
                 proceed_to_create_hospital = True # only if vals are set correctly (and not '')
                 break
+            
     
     name_new_hospital.close()
 
@@ -694,13 +728,17 @@ def popup_new_hospital(returntofunc):
         # This is the "main" new hospital window
         # If this is successful, we can _create_ the hospital dicts and update settings
         
+        print('running popup_show_hospital_info... from popup_new_hospital')
         popup_show_hospital_info(name=name_hosp_vals['popup_new_hospital_name'], fullname=name_hosp_vals['popup_new_hospital_fullname'], create_new=True)
+        
         try:
             if shot['conf_hosp'] == name_hosp_vals['popup_new_hospital_name']:
                 returntofunc = None
             else:
-                returntofunc = 'return_to_select_hospital'
+                # User cancel or other error, stop the madness
+                returntofunc = None
         except:
+            print('conf_hosp not set: return to select hospital')
             returntofunc = 'return_to_select_hospital'
     else:
         if there_was_an_error == 'name':
@@ -721,6 +759,15 @@ def popup_show_hospital_info(**kwargs):
     arguments: name=<str>, fullname=<str>, action=show/create <str>, returnto=<str>
     works completely fine without any supplied arguments too :)
     """
+    
+    # Uniform sizes
+    tsize_short = 12
+    tsize_long = 28
+    tsize_titl = (tsize_short,1) # text titles, e.g. "Created by: "
+    tsize_cont = (tsize_long,1) # text contents, eg: "random string of name"
+    tsize_spac = ((tsize_long+tsize_short)*2,1) # colspoan = 4
+    
+    
     # Parse args (or set defaults)
     create_new = kwargs.get('create_new', False) # this is a "create new hospital" scenario
     
@@ -730,18 +777,18 @@ def popup_show_hospital_info(**kwargs):
             shot['conf_hosp']
             shot['hospital']
             hospital_name = kwargs.get('name', shot['conf_hosp'])
-            hospital_fullname = kwargs.get('fullname', shot['hospital']['info']['fullname'])
+            hospital_fullname = kwargs.get('fullname', shot['hospital']['info']['full'])
             hospital_info_title = f"Hospital info - {hospital_name}"
             button_doit = 'OK'
-            button_other = shot['msg_change']
+            button_other = shot['msg_change'] # switch to different hospital
             button_cancel = shot['msg_cancel']
             created_tstamp = shot['hospital']['info']['created']
             created_user = shot['hospital']['info']['created-by']
             updated_tstamp = shot['hospital']['info']['updated']
             updated_user = shot['hospital']['info']['updated-by']
+            original_version = shot['hospital']['info']['version']
             hospital_departments = shot['hospital']['dep']
-            hospital_buildings = shot['hospital']['bld']
-            
+            hospital_buildings = shot['hospital']['bld']            
             
             do_go_on = True
         except:
@@ -749,32 +796,41 @@ def popup_show_hospital_info(**kwargs):
             do_go_on = False
     else:
         # Create new hospital scenario
+        
+        hospital_name = kwargs.get('name')
+        hospital_fullname = kwargs.get('fullname')
         hospital_info_title = f"{shot['msg_hospital_create']} - {hospital_name}"
         button_doit = shot['msg_hospital_create']
         button_cancel = shot['msg_cancel']
-        do_go_on = True
-        # Set author, creation date
-        try:
-            created_user = shot['username']
-        except:
-            # Must prompt for user
-            popup_uinput_single_string('username')
-            try:
-                created_user = shot['username']
-            except:
-                popup_some_error('Could not set username :(')
-                do_go_on = False
-
+        original_version = shot['version']
         created_tstamp = datetime.datetime.now().isoformat()
         updated_tstamp = created_tstamp
-        updated_user = created_user
         hospital_departments = {}
         hospital_buildings = {}
-        hospital_rooms = {}
+        hospital_rooms = {} # ? TODO
+
+        do_go_on = True
+        # Set author, creation date
+        
+        if get_username_from_config_or_read():
+            try:
+                created_user = shot['username']
+                updated_user = created_user
+                do_go_on = True
+            except:
+                do_go_on = False
+            
+        else:
+            do_go_on = False
+    
+    
+    # Get local date and time from timestamps (human readable)
+    created_date, created_time = created_tstamp.split(sep='T')
+    changed_date, changed_time = updated_tstamp.split(sep='T')
     
     
     # do_go_on workaround
-    # This is lazy, but there's no point in building and displaying a window that won't work
+    # This is lazy, but there's no point in building and displaying a window that will crash
     if do_go_on:
         
         if create_new:
@@ -791,21 +847,326 @@ def popup_show_hospital_info(**kwargs):
         # 
         # len(hospital['my_hosp']['bld'])
         
-        hospital_info_win = [
-                            [sg.T(f"{hospital_info_title}")],
-                            [sg.T(f"{shot['msg_hospital_purpose']}\n{shot['msg_hospital_overview']}\n\n")],
-                            
-                            # See this for table info: http://pythonic.zoomquiet.top/data/20180919092225/index.html # TODO TODO TODO
-                            
-                            [sg.InputText('', key='popup_new_hospital_name', size=(50,1))],
-                            [sg.T(f"{shot['msg_hospital_name_purpose']}\n\n\n{shot['msg_hospital_full_name']}:")],
-                            [sg.InputText('', key='popup_new_hospital_fullname', size=(50,1))],
-                            [sg.T(f"{shot['msg_hospital_full_name_purpose']}")],
-                            button_line
+        
+        # How  to table layout
+        
+        # layout = [
+        # [sg.Table(values=data,
+                  # headings=header_list,
+                  # display_row_numbers=True,
+                  # auto_size_columns=False,
+                  # num_rows=min(25, len(data)))]
+        #              ]
+        
+    # data er = []
+    # headings er []
+    
+    # shot['msg_hospital_name'] = 'Hospital name'
+    # shot['msg_hospital_full_name'] = 'Legal and administrative name'
+    # shot['msg_change'] = 'Change'
+    # shot['msg_cancel'] = 'Cancel'
+    # shot['msg_missing'] = 'Missing' # For errors, e.g. Missing: <some input>
+    # shot['msg_show'] = 'Show'
+    # shot['msg_version'] = 'Version'
+    # shot['msg_log'] = 'Log'
+    # shot['msg_input_created'] = 'Created'        # followed by timestamp
+    # shot['msg_input_created-by']  = 'Created by' # followed by username
+    # shot['msg_input_changed'] = 'Changed'        # followed by timestamp
+    # shot['msg_input_changed-by'] = 'Changed by'  # followed by username
+    # shot['msg_date'] = 'Date'
+    # shot['msg_time'] = 'Time'
+    # shot['msg_timestamp'] = 'Timestamp'
+        
+      
+        # Created
+        # Updated
+        # Changed
+        # ... huh
+        
+        # Note: These are not proper table elements, but tables of information sorted into rows and columns, using the Column element.
+ 
+        # TODO alternate view: have created-by and created in 1 column and changed-by and changed in 2nd column (vertical view might be easier to read)
+        # TODO alternate view: have created-by and created in 1 column and changed-by and changed in 2nd column (vertical view might be easier to read)
+
+        
+  
+  
+
+        
+        
+        if create_new:
+            number_of_buildings = 0
+            number_of_departments = 0
+            number_of_rooms_in_buildings = 0
+            number_of_rooms_in_departments = 0
+            buildings_room_list = []
+            departments_room_list = []
+            list_of_rooms = []
+            rooms_in_total = 0
+            room_coverage = [ '0.0%', '0.0%' ]
+            # If shot['hospital'] not initiated, add_building or add_department var check will do it.
+            
+        else:
+            
+            # TODO move these to separate functions later on, we will probably need it elsewhere too
+            # This should be done on hospital_load / as a consequence of popup_select_hospital()
+            
+            # hospital_buildings set above
+
+# legacy:            
+#            for room in hospital_buildings.values():
+#                rx in room:
+#                    buildings_room_list.append(rx)
+#            
+#            number_of_rooms_in_buildings  = len(buildings_room_list)
+            
+             # for container in shot['hospital'], large: 
+            # for room_id in container.keys(): 
+            
+            
+            # for subsect in hospital_buildings, hospital_departments:
+                # subsect_contents = []
+                # subsect_contents.append(len(subsect)) # number of items in subsect
+                # subsect_contents.append([ y for x in range(len(subsect.values())) for y in list(subsect.values())[x] ]) # list of all subitems of the items in subsect
+                # subsect_contents.append(len(subsect_room_list)) # number of items in list of subitems
+                # if id(subsect) == id(hospital_buildings):
+                    # number_of_buildings = subsect_contents[0]
+                    # buildings_room_list = subsect_contents[1]
+                    # number_of_rooms_in_buildings = subsect_contents[2]
+                # else:
+                    # number_of_departments = subsect_contents[0]
+                    # departments_room_list = subsect_contents[1]
+                    # number_of_rooms_in_departments = subsect_contents[2]
+                    
+                
+            # The latter is more readable though
+            
+            # Get 
+            number_of_buildings = len(hospital_buildings)
+            buildings_room_list = [ y for x in range(len(hospital_buildings.values())) for y in list(hospital_buildings.values())[x] ]
+            number_of_rooms_in_buildings  = len(buildings_room_list)
+            
+            
+            # Do same for dept
+            number_of_departments = len(hospital_departments)
+            departments_room_list = [ y for x in range(len(hospital_departments.values())) for y in list(hospital_departments.values())[x] ]
+            number_of_rooms_in_departments = len(departments_room_list)
+            
+            # Global room count for 'hospital' (currently selected hospital)
+            list_of_rooms = [ x for x in shot['hospital'].items() if len(str(x)) > 4 ] # skips bld, dep and info, the rest are unique rooms
+            rooms_in_total = len(list_of_rooms)
+            
+            # Room coverage (index: [0] buildings, [1], departments), in % of total
+            if rooms_in_total < 1 :
+                room_coverage = room_coverage = [ '0.0%', '0.0%' ]
+            else:
+                room_coverage = [ f"{(x/rooms_in_total)*100:0.1f}%" for x in [ rooms_in_buildings, rooms_in_departments] ]
+            
+
+
+    # Pertinent strings
+
+    # shot['msg_hospital_department'] = 'Department' # unit ..?
+    # shot['msg_hospital_departments'] = 'Departments'
+    # shot['msg_hospital_building'] = 'Building'
+    # shot['msg_hospital_buildings'] = 'Buildings'
+    # shot['msg_hospital_room'] = 'Room'
+    # shot['msg_hospital_rooms'] = 'Rooms'
+    # shot['msg_hospital_overview'] = 'A hospital contains buildings, departments and rooms.'    
+    # shot['msg_hospital_rooms_add'] = 'Add rooms'
+    # shot['msg_hospital_rooms_req'] = 'Rooms require at least one building and one department.'
+    # shot['msg_hospital_department_add'] = 'Add department'
+    # shot['msg_hospital_building_add'] = 'Add building'       
+       
+        
+        if number_of_departments == 0 and number_of_buildings == 0:
+            list_rooms_line = [sg.T(f"{shot['msg_hospital_rooms_req']}", size=tsize_spac, justification='center')]
+        elif rooms_in_total == 0:
+            list_rooms_line = [sg.T(f"{shot['msg_hospital_no_rooms']}", size=(tsize_long+tsize_short,1)), sg.Button(shot['msg_hospital_rooms_add'], key='addme_som_rooms_pls')]
+        else:
+            pass # Show some room stats and a button to open the room editor (will close this window)
+        
+        
+        
+        # Disable/enable View Buildings button
+        view_blds_disabled = False if number_of_rooms_in_buildings > 0 else True
+        view_deps_disabled = False if number_of_rooms_in_departments > 0 else True    
+        view_room_disabled = False if (number_of_rooms_in_departments > 0) or (number_of_rooms_in_buildings > 0) else True
+        
+        
+        # Buildings
+        table_buildings = [
+                          [sg.T(f"{shot['msg_hospital_buildings']}:", size=tsize_titl), sg.T(number_of_buildings, key='show_number_of_blds',size=tsize_cont), sg.T(f"{shot['msg_hospital_rooms']}:", size=tsize_titl), sg.T(number_of_rooms_in_buildings, size=tsize_cont)],
+                          [sg.T(f"{shot['msg_hospital_rooms_coverage']}:", size=tsize_titl, key='bld_line_title'), sg.T(room_coverage[0], size=tsize_cont, key='bld_line_conts'), sg.Button(shot['msg_hospital_building_add'], size=tsize_titl), sg.Button(f"{shot['msg_show']} {shot['msg_hospital_buildings'].lower()}", key='bld_view_list', size=tsize_titl, disabled=view_blds_disabled)]
+                          ]
+        
+        # Departments
+        table_departments = [
+                            [sg.T(f"{shot['msg_hospital_departments']}:", size=tsize_titl), sg.T(number_of_departments, key='show_number_of_deps', size=tsize_cont), sg.T(f"{shot['msg_hospital_rooms']}:", size=tsize_titl), sg.T(number_of_rooms_in_departments, size=tsize_cont)],
+                            [sg.T(f"{shot['msg_hospital_rooms_coverage']}:", size=tsize_titl, key='dep_line_title'), sg.T(room_coverage[1], size=tsize_cont, key='dep_line_conts'), sg.Button(shot['msg_hospital_department_add'], size=tsize_titl), sg.Button(shot['msg_hospital_departments'], key='dep_view_list', size=tsize_titl, disabled=view_deps_disabled)]
                             ]
         
         
-        # TODO    
+        # Administrative / log
+        table_adminfo = [
+                        [sg.T(f"{shot['msg_input_created']}:", size=tsize_titl), sg.T(created_date+' '+created_time, relief=sg.RELIEF_RIDGE, size=tsize_cont), sg.T(f"{shot['msg_input_created-by']}:", size=tsize_titl), sg.T(created_user, relief=sg.RELIEF_RIDGE, size=tsize_cont)],
+                        [sg.T(f"{shot['msg_input_changed']}:", size=tsize_titl), sg.T(changed_date+' '+changed_time, relief=sg.RELIEF_RIDGE, size=tsize_cont), sg.T(f"{shot['msg_input_changed-by']}:", size=tsize_titl), sg.T(updated_user, relief=sg.RELIEF_RIDGE, size=tsize_cont)],
+                        [sg.T(f"{shot['msg_version']}:", size=tsize_titl), sg.T(original_version, relief=sg.RELIEF_RIDGE, size=tsize_cont), sg.T(f"{shot['msg_version_current']}:", size=tsize_titl), sg.T(shot['version'], relief=sg.RELIEF_RIDGE, size=tsize_cont)]
+                        ]
+                          
+            
+        
+        hospital_info_win = [
+                            [sg.T(hospital_name)], # perhaps make this big and bold?
+                            [sg.T(f"{shot['msg_hospital_purpose']}\n{shot['msg_hospital_overview']}\n\n")],
+                            [sg.Frame(layout=[[sg.Col(table_adminfo)]], title=f"{shot['msg_log']}")],
+                            [sg.T(' ')],
+                            [sg.Frame(layout=[[sg.Col(table_buildings)]], title=f"{shot['msg_hospital_buildings']}")],
+                            [sg.T(' ')],
+                            [sg.Frame(layout=[[sg.Col(table_departments)]], title=f"{shot['msg_hospital_departments']}")],
+                            [sg.T(' ')],
+                            list_rooms_line,
+                            [sg.T(' ')],
+                            button_line
+                            ]
+        
+        # Create the window object
+        manage_hospital_win = sg.Window(hospital_info_title, layout=hospital_info_win, margins=(2, 2), resizable=False, return_keyboard_events=True, keep_on_top=False, finalize=True)
+        
+        while True:
+            # Status updates
+#            if subseq:
+            # Disable/enable View Buildings list button
+            manage_hospital_win['bld_view_list'].Update(disabled=view_blds_disabled)
+            manage_hospital_win['dep_view_list'].Update(disabled=view_deps_disabled)     
+            
+            # Debug       
+            print(f"view_blds_disabled = {view_blds_disabled}")
+            print(f"view_deps_disabled = {view_deps_disabled}")
+            print(f"hospital_buildings = {hospital_buildings}")
+            print(f"hospital_departments = {hospital_departments}")
+            
+            # Window read
+            hosp_info_event, hosp_info_vals = manage_hospital_win.read()
+            print(f'hosp_info_event={hosp_info_event}')
+            print(f'hosp_info_vals={hosp_info_vals}')
+            
+            
+            if hosp_info_event is None or hosp_info_event == button_cancel:
+                break
+            elif hosp_info_event == shot['msg_hospital_building_add']:
+                bld_candidate = popup_uinput_single_string('add_building')
+                if type(bld_candidate) != bool:
+                    if create_new:
+                        # Add to local dict
+                        try:
+                            hospital_buildings[bld_candidate]
+                            popup_some_error(f"{shot['msg_hospital_building']} '{bld_candidate}' {shot['msg_already_exists']}.")
+                        except:
+                            try:
+                                hospital_buildings[bld_candidate] = {}
+                                print(f"Added {bld_candidate} to local buildings dict")
+                            except:
+                                popup_some_error(f"Could not add '{bld_candidate}' {shot['msg_hospital_building']} for unknown reasons.")
+                    else:
+                        # add to shot['hospital']
+                        if not add_hospital_section('bld', bld_candidate):
+                            popup_some_error(f"{shot['msg_hospital_building']} '{bld_candidate}' {shot['msg_already_exists']}.")
+                            bld_candidate = None
+            elif hosp_info_event == shot['msg_hospital_department_add']:
+                dep_candidate = popup_uinput_single_string('add_department')
+                if type(dep_candidate) != bool:
+                    if create_new:
+                        # add to local dict first (special case)
+                        try:
+                            hospital_departments[dep_candidate]
+                            popup_some_error(f"{shot['msg_hospital_department']} '{dep_candidate}' {shot['msg_already_exists']}.")
+                        except:
+                            try:
+                                hospital_departments[dep_candidate] = {}
+                                print(f"Added {dep_candidate} to local departments dict")
+                            except:
+                                popup_some_error(f"Could not add '{dep_candidate}' {shot['msg_hospital_building']} for unknown reasons.")
+                    else:
+                        # add to shot['hospital'] using generic add_hospital_section function
+                        if not add_hospital_section('dep', dep_candidate):
+                            popup_some_error(f"{shot['msg_hospital_department']} '{dep_candidate}' {shot['msg_already_exists']}.")
+                            dep_candidate = None                
+            elif hosp_info_event == shot['msg_hospital_create']:
+                if number_of_departments == 0 and number_of_buildings == 0:
+                    popup_some_error(f"{shot['msg_hospital_no_buildings']}\n{shot['msg_hospital_no_departments']}\n{shot['msg_hospital_rooms_req']}")
+                elif rooms_in_total == 0:
+                    popup_some_error(f"{shot['msg_hospital_overview']} {shot['msg_hospital_no_rooms']}")
+                else:
+                    print('hospital create scenario TODO') # TODO
+            
+            
+            # Update numbers
+            # Buildings
+            number_of_buildings = len(hospital_buildings.keys())
+            buildings_room_list = [ y for x in range(len(hospital_buildings.values())) for y in list(hospital_buildings.values())[x] ]
+            number_of_rooms_in_buildings  = len(buildings_room_list)
+            
+            # Departments
+            number_of_departments = len(hospital_departments.keys())
+            departments_room_list = [ y for x in range(len(hospital_departments.values())) for y in list(hospital_departments.values())[x] ]
+            number_of_rooms_in_departments = len(departments_room_list)
+            
+            # Global room count for 'hospital' (currently selected hospital)
+            if create_new:
+                list_of_rooms = list(set(departments_room_list + buildings_room_list)) # this is factually incorrect, but provides an estimate.
+                print(f"list_of_rooms = {list_of_rooms}")
+            else:
+                list_of_rooms = [ x for x in shot['hospital'].items() if len(str(x)) > 4 ] # skips bld, dep and info, the rest are unique rooms
+            rooms_in_total = len(list_of_rooms)
+            
+            
+            # Update calculations
+            if rooms_in_total == 0:
+                room_coverage = room_coverage = [ '0.0%', '0.0%' ]
+                view_room_disabled = True
+            else:
+                room_coverage = [ f"{(x/rooms_in_total)*100:0.1f}%" for x in [ rooms_in_buildings, rooms_in_departments] ]
+                view_room_disabled = False if (number_of_rooms_in_departments > 0) or (number_of_rooms_in_buildings > 0) else True
+            
+            view_blds_disabled = True if number_of_buildings == 0 else False
+            view_deps_disabled = True if number_of_departments == 0 else False
+                
+            #number_of_buildings = len(hospital_buildings)
+
+            
+            # Update GUI stringsand fields
+            manage_hospital_win.Finalize
+            manage_hospital_win['show_number_of_deps'].update(value=number_of_departments)
+            manage_hospital_win['show_number_of_blds'].update(value=number_of_buildings)
+            
+        
+        manage_hospital_win.close()
+        
+    # TODO
+
+def add_hospital_section(sub_type, sub_name):
+    """
+    add subsect_name (str) to 'bld' / 'dep' sub dict of shot['hospital']
+    e.g. add_hospital_section('dep', 'intensive care')
+    returns bool ( True == subsect added successfully
+    """
+    try:
+        shot['hospital'][sub_type]
+    except:
+        try:
+            shot['hospital']
+            shot['hospital'][sub_type] = {}
+        except:
+            shot['hospital'] = {}
+            shot['hospital'][sub_type] = {}
+    
+    try:
+        shot['hospital'][sub_type][str(sub_name)]
+        return False # already added
+    except:
+        shot['hospital'][sub_type][str(sub_name)] = {}
+        return True # added building
 
 def popup_select_hospital():
     """
@@ -903,7 +1264,10 @@ def popup_uinput_single_string(popup_query_type):
     """
     
     # Set default fallback
-    run_this_popup = False
+    run_this_popup = False # not sure we need this one ...
+    uinput_popup_button_doit = 'OK'
+    uinput_popup_button_cancel = shot['msg_cancel']
+    uinput_popup_defaults = ''
     
     if 'username' in popup_query_type:
         uinput_popup_title = shot['msg_user_change']
@@ -911,15 +1275,30 @@ def popup_uinput_single_string(popup_query_type):
         uinput_popup_pretext = shot['msg_user']
         uinput_popup_keyname = 'username_popup_inputfield' # any unique string we can check
         uinput_popup_button_doit = shot['msg_change']
-        uinput_popup_button_cancel = shot['msg_cancel']
         
         # set default text shown (if set)
         try:
             uinput_popup_defaults = shot['username']
         except:
-            uinput_popup_defaults = '' # in case var not set
+            uinput_popup_defaults = '' 
         
         # Finally, set to run
+        run_this_popup = True
+    elif 'add_building' in popup_query_type:
+        # typically ran from popup_show_hospital_info()
+        uinput_popup_title = shot['msg_hospital_building_add']
+        uinput_popup_purpose = shot['msg_hospital_building_purpose']
+        uinput_popup_pretext = shot['msg_hospital_building_name']
+        uinput_popup_keyname = 'addbuilding_popup_inputfield'
+        uinput_popup_button_doit = shot['msg_hospital_building_add']
+        run_this_popup = True
+    elif 'add_department' in popup_query_type:
+        # typically ran from popup_show_hospital_info()
+        uinput_popup_title = shot['msg_hospital_department_add']
+        uinput_popup_purpose = shot['msg_hospital_department_purpose']
+        uinput_popup_pretext = shot['msg_hospital_department_name']
+        uinput_popup_keyname = 'adddepartment_popup_inputfield'
+        uinput_popup_button_doit = shot['msg_hospital_department_add']
         run_this_popup = True
     elif 'hospital_name' in popup_query_type:
         
@@ -934,7 +1313,7 @@ def popup_uinput_single_string(popup_query_type):
         try:
             uinput_popup_defaults = shot['hospital']
         except:
-            uinput_popup_defaults = '' # in case var not set
+            uinput_popup_defaults = uinput_popup_defaults # var not set
         
         
     else:
@@ -943,11 +1322,11 @@ def popup_uinput_single_string(popup_query_type):
     if run_this_popup:
         uinput_popup_popup_layout = [
                                     [sg.T(uinput_popup_purpose)],
-                                    [sg.T(f"{uinput_popup_pretext}: "), sg.InputText(uinput_popup_defaults, key= uinput_popup_keyname, size=(50,1))],
+                                    [sg.T(f"{uinput_popup_pretext}: "), sg.InputText(uinput_popup_defaults, key=uinput_popup_keyname, size=(50,1))],
                                     [sg.Button(uinput_popup_button_doit), sg.Button(uinput_popup_button_cancel)]
                                     ]
         
-        do_run_this_popup = sg.Window(uinput_popup_title, layout=uinput_popup_popup_layout, margins=(2, 2), resizable=False, return_keyboard_events=True)
+        do_run_this_popup = sg.Window(uinput_popup_title, layout=uinput_popup_popup_layout, margins=(2, 2), resizable=False, return_keyboard_events=True, keep_on_top=True)
         while True:
             uchname_event, uchname_vals = do_run_this_popup.read()
             
@@ -959,33 +1338,61 @@ def popup_uinput_single_string(popup_query_type):
                 if uchname_vals[uinput_popup_keyname] == '':
                     pass
                 else:
+                    uinput_input_val = str(uchname_vals[uinput_popup_keyname])
                     if 'username' in popup_query_type:
-                        shot['username'] = str(uchname_vals[uinput_popup_keyname])
+                        shot['username'] = uinput_input_val
                         print(f"shot['username'] set to {shot['username']}") # debug
-                    else:
-                        pass # do the others here
+                    elif 'add_building' in popup_query_type or 'add_department' in popup_query_type:
+                        if type(uinput_input_val) == bool or uinput_input_val == '':
+                            pass # lazy eval, try pyinputplus here or what?
+                        else:
+                            run_this_popup = uinput_input_val
+                        
+                        
+#                        if add_hospital_section('bld', uinput_input_val):
+ #                           run_this_popup = True
+  #                      else:
+   #                         run_this_popup = False
+#                    elif 'add_department' in popup_query_type:
+ #                       run_this_popup = uinput_input_val
+ #                       
+ #                       if add_hospital_section('dep', uinput_input_val):
+ #                           run_this_popup = True
+ #                       else:
+ #                           run_this_popup = False
                 break
         do_run_this_popup.close()
     
     # This is probably meaningless
-    return run_this_popup
+    return run_this_popup # TODO rename this bollock
 
 
 def get_username_from_config_or_read():
     """
     Simple function to make sure that shot['username'] is set and not None
+    Returns True if username could be read or set.
     """
     try:
         shot['username'] # is set
         if shot['username'] is None: popup_uinput_single_string('username')
+        if shot['username'] == 'None': print('username set to str(None)..')
     except:
         try:
             shot['conf_user'] # is configured but not set
-            shot['username'] = shot['conf_user'] # is set
-            if shot['username'] is None: popup_uinput_single_string('username')
+            if shot['conf_user'] is None:
+                popup_uinput_single_string('username')
+            else:
+                shot['username'] = shot['conf_user'] # is set
         except:
-            # TODO: add visible warning (popup)
             popup_uinput_single_string('username')
+    
+    try:
+        shot['username']
+        if shot['username'] is None: print('username set to none type')
+        if shot['username'] == 'None': print('username set to str(None) second..')
+        return True
+    except:
+        return False
     
 
 def new_outbreak_file():
@@ -996,25 +1403,27 @@ def new_outbreak_file():
     """
     
     # First, set/get username
-    get_username_from_config_or_read()
-    
-    # Get hospital info from config parser
-    if shot['is_configured']:
+    if get_username_from_config_or_read():
         
-        # TODO get hospital info
-        # Note: this might be the wrong hospital, if so, user must change this in Settings->Hospital
-        
-        
-        
-        if popup_select_hospital():
-            pass # TODO
+        # Get hospital info from config parser
+        if shot['is_configured']:
             
-        
+            # TODO get hospital info
+            # Note: this might be the wrong hospital, if so, user must change this in Settings->Hospital
+            
+            
+            
+            if popup_select_hospital():
+                pass # TODO
+                
+            
+        else:
+            # We have user name
+            #
+            pass # TODO
+            # TODO setup hospital info and  
     else:
-        # We have user name
-        #
-        pass # TODO
-        # TODO setup hospital info and  
+        popup_some_error(shot['msg_user_unset'])
         
 
     
@@ -1442,10 +1851,18 @@ def set_gui_strings(language):
     shot['msg_cancel'] = 'Cancel'
     shot['msg_missing'] = 'Missing' # For errors, e.g. Missing: <some input>
     shot['msg_show'] = 'Show'
+    shot['msg_version'] = 'Version'
+    shot['msg_name'] = 'Name' # used for people, things, buildings
+    shot['msg_version_current'] = 'Current'
+    shot['msg_log'] = 'Log'
     shot['msg_input_created'] = 'Created'        # followed by timestamp
     shot['msg_input_created-by']  = 'Created by' # followed by username
     shot['msg_input_changed'] = 'Changed'        # followed by timestamp
     shot['msg_input_changed-by'] = 'Changed by'  # followed by username
+    shot['msg_date'] = 'Date'
+    shot['msg_time'] = 'Time'
+    shot['msg_timestamp'] = 'Timestamp'
+    shot['msg_already_exists'] = 'already exists' # as in error message: {some thing} already exists
 
     # User related strings
     shot['msg_user'] = 'User'
@@ -1466,6 +1883,9 @@ def set_gui_strings(language):
     
     # Hospital admin strings
     shot['msg_hospital_no_hospitals'] = 'There are no hospitals configured.'
+    shot['msg_hospital_no_buildings'] = 'There are no buildings configured.'
+    shot['msg_hospital_no_departments'] = 'There are no departments configured.'
+    shot['msg_hospital_no_rooms'] = 'There are no rooms configured.'
     shot['msg_hospital_create'] = 'Create new hospital'
     shot['msg_hospital_purpose'] = 'Registering outbreaks in terms of rooms, departments and buildings simplify tracking and heatmap creation.'
     shot['msg_hospital_overview'] = 'A hospital contains buildings, departments and rooms.'
@@ -1476,13 +1896,24 @@ def set_gui_strings(language):
     shot['msg_hospital_full_name_purpose'] = 'Full legal and administrative name of the hospital (for printed output)'
     shot['msg_hospital_department'] = 'Department' # unit ..?
     shot['msg_hospital_departments'] = 'Departments'
+    shot['msg_hospital_department_add'] = 'Add department'
+    shot['msg_hospital_department_purpose'] = 'Departments are used to track outbreaks in administrative and logistical space.'
+    shot['msg_hospital_department_name'] = 'Name'
     shot['msg_hospital_building'] = 'Building'
     shot['msg_hospital_buildings'] = 'Buildings'
+    shot['msg_hospital_building_add'] = 'Add building'
+    shot['msg_hospital_building_purpose'] = 'Buildings are used to track outbreaks in physical space. They house departments and rooms.'
+    shot['msg_hospital_building_name'] = 'Name'
     shot['msg_hospital_room'] = 'Room'
     shot['msg_hospital_rooms'] = 'Rooms'
+    shot['msg_hospital_rooms_add'] = 'Add rooms'
+    shot['msg_hospital_rooms_req'] = 'Adding rooms requires one building and one department.'
+    shot['msg_hospital_rooms_coverage'] = 'Coverage' # how many rooms are spoken of
+    
     
     # Medical strings
     # TODO
+    
     
     
     
@@ -2068,10 +2499,18 @@ while True:             # Event Loop
         window.Finalize()
         status_message = 'Printing ..'
     elif event in shot['file_new'] or event in f"-{shot['icon_key_new']}-" or event in shot['icon_key_new']:
+        # try:
+            # if len(shot['hospital']) == 0: popup_some_error(shot['msg_hospital_no_hospitals'])
+        # except KeyError:
+            # popup_some_error(shot['msg_hospital_no_hospitals'])
         
+        # Select or create hospital
+        popup_select_hospital()
         
-        
-        popup_some_error('File-> New not implemented yet.')
+        #
+        # TODO create new file workflow
+
+        # debug setting:
         outbreak_filename = None
     
     elif event in shot['file_close']:
