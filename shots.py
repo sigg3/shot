@@ -645,13 +645,92 @@ def popup_new_department():
     pass
 
 
-def popup_new_room():
+def popup_new_room(hospital_buildings, hospital_departments):
     """
     Creates a new hospital room (child of all, smallest unit for tracking)
     Rooms are first and foremost the smallest location info for any single patient.
     Rooms belongs physically to a building and logically to a department.
+    # Legend: popup_new_room(shot['hospital']['bld'], shot['hospital']['dep'])
     returns information added in order: room_id, room_dep, room_bld, room_uniq, status
     """
+    
+    # shot['msg_hospital_room_req'] = 'A room requires a building or a department, preferably both.'
+    # shot['msg_hospital_room_whatis'] = 'Rooms are the smallest units of the hospital.'
+    # shot['msg_hospital_room_indiv'] = 'Add individual rooms separated by comma.'
+    # shot['msg_hospital_room_range'] = 'Add a range of rooms by using a hyphen, e.g. 1-100.'
+    # shot['msg_hospital_room_status'] = 'Status'
+    
+    list_of_departments = list(hospital_buildings)
+    list_of_buildings = list(hospital_departments)
+    
+    
+    cell_size = (20,1)
+    
+    new_rooms_row = [
+                    [sg.T(f"{shot['msg_hospital_building']}:", size=cell_size), sg.T(f"{shot['msg_hospital_department']}:", size=cell_size), sg.T(f"{shot['msg_hospital_room']} / {shot['msg_hospital_rooms']}:", size=cell_size)],
+                    [sg.Combo((list_of_buildings),default_value='Combobox 1', size=(20, 1)),sg.Combo((list_of_departments),default_value='Combobox 1', size=(20, 1)), sg.In('', size=cell_size)]
+                    ]
+    
+    set_status_row = []
+#                     [sg.Radio(' '),
+#                     [sg.Radio(shot['msg_hospital_create'], "input_create_new_hospital", key='hospital_selector_donew', default=use_createnew_default)],
+#                     ]
+                     
+    
+    
+    # shot['msg_hospital_room_status_none'] = 'None'
+    # shot['msg_hospital_room_status_contaminated'] = 'Contaminated'
+    # shot['msg_hospital_room_status_atrisk'] = 'At risk'
+    # shot['msg_hospital_room_status_empty'] = 'Empty'
+    # shot['msg_hospital_room_status_niu'] = 'Not in use'
+    
+    
+    # Combo(values,
+    # default_value=None,
+    # size=(None, None),
+    # auto_size_text=None,
+    # background_color=None,
+    # text_color=None,
+    # change_submits=False,
+    # enable_events=False,
+    # disabled=False,
+    # key=None,
+    # pad=None,
+    # tooltip=None,
+    # readonly=False,
+    # font=None,
+    # visible=True,
+    # metadata=None)
+
+
+    # Checkbox(text,
+    # default=False,
+    # size=(None, None),
+    # auto_size_text=None,
+    # font=None,
+    # background_color=None,
+    # text_color=None,
+    # change_submits=False,
+    # enable_events=False,
+    # disabled=False,
+    # key=None,
+    # pad=None,
+    # tooltip=None,
+    # visible=True,
+    # metadata=None)
+    
+    
+  #  [sg.Frame(layout=[[sg.Col(table_rooms)]], title=f"{shot['msg_hospital_rooms']}")],
+    
+    
+    create_new_room_win = [
+                          [sg.T(f"{shot['msg_hospital_room_whatis']}\n{shot['msg_hospital_room_indiv']} {shot['msg_hospital_room_range']}\n")],
+                          [sg.Col(new_rooms_row)],
+                          [sg.Frame(layout=[[sg.Col(set_status_row)]], title=f"{shot['msg_hospital_room_status']}")],
+                          [sg.Button('OK'), sg.Button(shot['msg_cancel'])]
+                          ]
+    
+    # use this as title for poup = shot['msg_hospital_rooms_add']
     
     pass
 
@@ -1123,14 +1202,13 @@ def popup_show_hospital_info(**kwargs):
             elif hosp_info_event == add_rooms_button:
                 print('will run popup_new_room() TODO')
                 
-                room_id, room_dep, room_bld, room_uniq, status = popup_new_room()
+#                room_id, room_dep, room_bld, room_uniq, status = popup_new_room(hospital_buildings, hospital_departments)
                 
                 
                 if create_new:
-                    
+                    pass # TODO
                 else:
-                    
-                print('will run popup_new_room TODO')
+                    pass # TODO
             elif hosp_info_event == shot['msg_hospital_create']:
                 if number_of_departments == 0 and number_of_buildings == 0:
                     popup_some_error(f"{shot['msg_hospital_no_buildings']}\n{shot['msg_hospital_no_departments']}\n{shot['msg_hospital_rooms_req']}")
@@ -1967,12 +2045,22 @@ def set_gui_strings(language):
     shot['msg_hospital_building_purpose'] = 'Buildings are used to track outbreaks in physical space. They house departments and rooms.'
     shot['msg_hospital_building_name'] = 'Name'
     shot['msg_hospital_room'] = 'Room'
+    shot['msg_hospital_room_add'] = 'Add room'
     shot['msg_hospital_rooms'] = 'Rooms'
     shot['msg_hospital_rooms_add'] = 'Add rooms'
     shot['msg_hospital_rooms_req'] = 'Adding rooms requires one building and one department.'
     shot['msg_hospital_rooms_coverage'] = 'Coverage' # how many rooms are spoken of
     shot['msg_hospital_rooms_contaminated'] = 'Contaminated rooms (estimate)'
-    
+    shot['msg_hospital_room_req'] = 'A room requires a building or a department, preferably both.'
+    shot['msg_hospital_room_whatis'] = 'Rooms are the smallest units of the hospital.'
+    shot['msg_hospital_room_indiv'] = 'Add individual rooms separated by comma.'
+    shot['msg_hospital_room_range'] = 'Add a range of rooms by using a hyphen, e.g. 1-100.'
+    shot['msg_hospital_room_status'] = 'Status'
+    shot['msg_hospital_room_status_none'] = 'None'
+    shot['msg_hospital_room_status_contaminated'] = 'Contaminated'
+    shot['msg_hospital_room_status_atrisk'] = 'At risk'
+    shot['msg_hospital_room_status_empty'] = 'Empty'
+    shot['msg_hospital_room_status_niu'] = 'Not in use'
     
     # Medical strings
     # TODO
