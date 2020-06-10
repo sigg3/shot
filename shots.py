@@ -647,10 +647,12 @@ def popup_new_department():
 
 def popup_new_room():
     """
-    Creates a new hospital room (child of all)
+    Creates a new hospital room (child of all, smallest unit for tracking)
     Rooms are first and foremost the smallest location info for any single patient.
     Rooms belongs physically to a building and logically to a department.
+    returns information added in order: room_id, room_dep, room_bld, room_uniq, status
     """
+    
     pass
 
 
@@ -759,6 +761,7 @@ def popup_show_hospital_info(**kwargs):
     Shows hospital info of input hospital name (str) or configured shot['conf_hosp']
     arguments: name=<str>, fullname=<str>, action=show/create <str>, returnto=<str>
     works completely fine without any supplied arguments too :)
+    WARNING: This function is subject to change. It confuses GUI and functional logic.
     """
     
     # Uniform sizes
@@ -789,8 +792,7 @@ def popup_show_hospital_info(**kwargs):
             updated_user = shot['hospital']['info']['updated-by']
             original_version = shot['hospital']['info']['version']
             hospital_departments = shot['hospital']['dep']
-            hospital_buildings = shot['hospital']['bld']            
-            
+            hospital_buildings = shot['hospital']['bld']
             do_go_on = True
         except:
             popup_some_error(shot['msg_hospital_no_hospitals'])
@@ -1081,46 +1083,54 @@ def popup_show_hospital_info(**kwargs):
             print(f'hosp_info_vals={hosp_info_vals}')
             
             
+            # Parse window events and execute
             if hosp_info_event is None or hosp_info_event == button_cancel:
                 break
-            elif hosp_info_event == shot['msg_hospital_building_add']:
-                bld_candidate = popup_uinput_single_string('add_building')
-                if type(bld_candidate) != bool:
+            elif hosp_info_event == shot['msg_hospital_building_add'] or hosp_info_event == shot['msg_hospital_department_add']:
+                if hosp_info_event == shot['msg_hospital_building_add']:
+                    already_exists_error = shot['msg_hospital_building']
+                    referral_dict = hospital_buildings
+                    the_candidate_is = 'bld'
+                    the_candidate = popup_uinput_single_string('add_building')
+                else:
+                    already_exists_error = shot['msg_hospital_department']
+                    referral_dict = hospital_departments
+                    the_candidate_is = 'dep'
+                    the_candidate = popup_uinput_single_string('add_department')
+                
+                if type(the_candidate) != bool: # weird check (but it's if people hit enter on empty field in popup_uinput_single_string()
+                    already_exists_error = f"{already_exists_error} '{the_candidate}' {shot['msg_already_exists']}."
                     if create_new:
                         # Add to local dict
                         try:
-                            hospital_buildings[bld_candidate]
-                            popup_some_error(f"{shot['msg_hospital_building']} '{bld_candidate}' {shot['msg_already_exists']}.")
+                            referral_dict[the_candidate]
+                            popup_some_error(already_exists_error)
                         except:
+                            print(f"{the_candidate} does not exist. Trying to add referral_dict[the_candidate] = ()")
                             try:
-                                hospital_buildings[bld_candidate] = {}
-                                print(f"Added {bld_candidate} to local buildings dict")
+                                referral_dict[the_candidate] = {}
+                                if id(referral_dict) == id(hospital_buildings) :
+                                    print(f"referral_dict = {id(referral_dict)} == buildings")
+                                else:
+                                    print(f"referral_dict = {id(referral_dict)} == departments")
+                                print(f"success: added {the_candidate} {the_candidate_is} to local subsect dict")
                             except:
-                                popup_some_error(f"Could not add '{bld_candidate}' {shot['msg_hospital_building']} for unknown reasons.")
+                                popup_some_error(f"Could not add '{the_candidate}' to shot['hospital'][{the_candidate_is}] for unknown reasons.") # TODO
                     else:
-                        # add to shot['hospital']
-                        if not add_hospital_section('bld', bld_candidate):
-                            popup_some_error(f"{shot['msg_hospital_building']} '{bld_candidate}' {shot['msg_already_exists']}.")
-                            bld_candidate = None
-            elif hosp_info_event == shot['msg_hospital_department_add']:
-                dep_candidate = popup_uinput_single_string('add_department')
-                if type(dep_candidate) != bool:
-                    if create_new:
-                        # add to local dict first (special case)
-                        try:
-                            hospital_departments[dep_candidate]
-                            popup_some_error(f"{shot['msg_hospital_department']} '{dep_candidate}' {shot['msg_already_exists']}.")
-                        except:
-                            try:
-                                hospital_departments[dep_candidate] = {}
-                                print(f"Added {dep_candidate} to local departments dict")
-                            except:
-                                popup_some_error(f"Could not add '{dep_candidate}' {shot['msg_hospital_building']} for unknown reasons.")
-                    else:
-                        # add to shot['hospital'] using generic add_hospital_section function
-                        if not add_hospital_section('dep', dep_candidate):
-                            popup_some_error(f"{shot['msg_hospital_department']} '{dep_candidate}' {shot['msg_already_exists']}.")
-                            dep_candidate = None                
+                        # Add to shot['hospital'] dict
+                        if not add_hospital_section(the_candidate_is, the_candidate):
+                            popup_some_error(already_exists_error)
+            elif hosp_info_event == add_rooms_button:
+                print('will run popup_new_room() TODO')
+                
+                room_id, room_dep, room_bld, room_uniq, status = popup_new_room()
+                
+                
+                if create_new:
+                    
+                else:
+                    
+                print('will run popup_new_room TODO')
             elif hosp_info_event == shot['msg_hospital_create']:
                 if number_of_departments == 0 and number_of_buildings == 0:
                     popup_some_error(f"{shot['msg_hospital_no_buildings']}\n{shot['msg_hospital_no_departments']}\n{shot['msg_hospital_rooms_req']}")
@@ -1130,7 +1140,7 @@ def popup_show_hospital_info(**kwargs):
                     print('hospital create scenario TODO') # TODO
             
             
-            # Update numbers
+            # Post execute : Update numbers and fields
             # Buildings
             number_of_buildings = len(hospital_buildings.keys())
             buildings_room_list = [ y for x in range(len(hospital_buildings.values())) for y in list(hospital_buildings.values())[x] ]
@@ -1175,8 +1185,17 @@ def popup_show_hospital_info(**kwargs):
                 dep_conjug = shot['msg_hospital_department'] if number_of_departments == 1 else shot['msg_hospital_departments']
                 room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
                 list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug}, {number_of_departments} {dep_conjug}, {rooms_in_total} {room_conjug}"
-                
             
+            # Do estimate of infected rooms
+            if rooms_in_total == 0:
+                rooms_with_deviating_status = []
+                est_contaminated_rooms_int = 0
+                est_contaminated_rooms_per = '0.0%'
+            else:
+                rooms_with_deviating_status = [ x[0] for x in shot['hospital'].items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                est_contaminated_rooms_int = len(rooms_with_deviating_status)
+                est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"            
+                
             # Update GUI stringsand fields
             manage_hospital_win.Finalize
             manage_hospital_win['room_conditional_text'].update(value=list_rooms_line)
