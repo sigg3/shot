@@ -653,36 +653,35 @@ def popup_new_room(hospital_buildings, hospital_departments):
     # Legend: popup_new_room(shot['hospital']['bld'], shot['hospital']['dep'])
     returns information added in order: room_id, room_dep, room_bld, room_uniq, status
     """
-    
-    # shot['msg_hospital_room_req'] = 'A room requires a building or a department, preferably both.'
-    # shot['msg_hospital_room_whatis'] = 'Rooms are the smallest units of the hospital.'
-    # shot['msg_hospital_room_indiv'] = 'Add individual rooms separated by comma.'
-    # shot['msg_hospital_room_range'] = 'Add a range of rooms by using a hyphen, e.g. 1-100.'
-    # shot['msg_hospital_room_status'] = 'Status'
-    
-    list_of_departments = list(hospital_buildings)
-    list_of_buildings = list(hospital_departments)
+    # Get the list from cli args
+    list_of_departments = list(hospital_departments)
+    list_of_buildings = list(hospital_buildings)
     
     
-    cell_size = (20,1)
+    # Arbitrary uniform size
+    cell_combo = (20,1)
+    cell_text = (22,1)
+    cell_radio = (18,1)
     
-    new_rooms_row = [
-                    [sg.T(f"{shot['msg_hospital_building']}:", size=cell_size), sg.T(f"{shot['msg_hospital_department']}:", size=cell_size), sg.T(f"{shot['msg_hospital_room']} / {shot['msg_hospital_rooms']}:", size=cell_size)],
-                    [sg.Combo((list_of_buildings),default_value='Combobox 1', size=(20, 1)),sg.Combo((list_of_departments),default_value='Combobox 1', size=(20, 1)), sg.In('', size=cell_size)]
-                    ]
+    # Create columns
+    new_rooms_rows = [
+                     [sg.T(f"{shot['msg_hospital_building']}:", size=cell_text), sg.T(f"{shot['msg_hospital_department']}:", size=cell_text), sg.T(f"{shot['msg_hospital_room']} / {shot['msg_hospital_rooms']}:", size=cell_text)],
+                     [sg.Combo((list_of_buildings),default_value=None, size=(20, 1)),sg.Combo((list_of_departments),default_value=None, size=(20, 1)), sg.In('', size=cell_combo)]
+                     ]
+
     
-    set_status_row = []
-#                     [sg.Radio(' '),
-#                     [sg.Radio(shot['msg_hospital_create'], "input_create_new_hospital", key='hospital_selector_donew', default=use_createnew_default)],
-#                     ]
-                     
+    # Do 2x2 matrix with radions
+    # nut really 3x2 columns, because the 6th one must also show input field enabled if Other/specify is chosen. # TODO
     
     
-    # shot['msg_hospital_room_status_none'] = 'None'
-    # shot['msg_hospital_room_status_contaminated'] = 'Contaminated'
-    # shot['msg_hospital_room_status_atrisk'] = 'At risk'
-    # shot['msg_hospital_room_status_empty'] = 'Empty'
-    # shot['msg_hospital_room_status_niu'] = 'Not in use'
+#    set_status_row = [
+            
+    
+    set_status_row = [
+                     [sg.CBox(shot['msg_hospital_room_status_none'], default=True, key='status_NONE', enable_events=True)],
+                     [sg.Radio(shot['msg_hospital_room_status_empty'], 'status radios', size=cell_radio, key='radio_empty', enable_events=True, disabled=True), sg.Radio(shot['msg_hospital_room_status_niu'], 'status radios', size=cell_radio, key='radio_niu', enable_events=True, disabled=True), sg.Radio(shot['msg_hospital_room_status_atrisk'], 'status radios', key='radio_atrisk', enable_events=True, disabled=True)],
+                     [sg.Radio(shot['msg_hospital_room_status_contaminated'], 'status radios', size=cell_radio, key='radio_contam', enable_events=True, disabled=True), sg.Radio(shot['msg_hospital_room_status_custom'], 'status radios', size=cell_radio, key='radio_other', enable_events=True, disabled=True), sg.T(f"{shot['msg_hospital_room_status_spec']}:", key='specify_title', text_color='grey'), sg.In('', key='custom_status', size=cell_text, disabled=True)]
+                     ]
     
     
     # Combo(values,
@@ -724,15 +723,64 @@ def popup_new_room(hospital_buildings, hospital_departments):
     
     
     create_new_room_win = [
-                          [sg.T(f"{shot['msg_hospital_room_whatis']}\n{shot['msg_hospital_room_indiv']} {shot['msg_hospital_room_range']}\n")],
-                          [sg.Col(new_rooms_row)],
-                          [sg.Frame(layout=[[sg.Col(set_status_row)]], title=f"{shot['msg_hospital_room_status']}")],
+                          [sg.T(f"{shot['msg_hospital_room_whatis']}\n{shot['msg_hospital_room_indiv']} {shot['msg_hospital_room_range']}")],
+                          [sg.Col(new_rooms_rows)],
+                          [sg.Frame(layout=set_status_row, title=f"{shot['msg_hospital_room_status_title']}")],
                           [sg.Button('OK'), sg.Button(shot['msg_cancel'])]
                           ]
     
     # use this as title for poup = shot['msg_hospital_rooms_add']
+    create_new_room = sg.Window(shot['msg_hospital_rooms_add'], layout=create_new_room_win, margins=(2, 2), resizable=False, keep_on_top=True, return_keyboard_events=True, finalize=True)
     
-    pass
+    # by default, custom input and radios are disabled
+    deny_custom_input = True
+    disable_radios = True
+    loop_keys = ['radio_empty', 'radio_niu', 'radio_atrisk', 'radio_contam', 'radio_other', 'custom_status']
+    
+    while True:        
+        # GUI Status changes
+        if disable_radios:
+            for status_type in loop_keys:
+                create_new_room[status_type].Update(disabled=True)
+            create_new_room['specify_title'].Update(text_color='grey')
+        else:
+            for status_type in loop_keys:
+                if status_type != 'custom_status': create_new_room[status_type].Update(disabled=False)
+            
+            if deny_custom_input:
+                create_new_room['custom_status'].Update(disabled=True)
+                create_new_room['specify_title'].Update(text_color='grey')
+            else:
+                create_new_room['custom_status'].Update(disabled=False)
+                create_new_room['specify_title'].Update(text_color='black')
+        
+        
+        croom_event, croom_value = create_new_room.read()
+        print(f'croom_event={croom_event}') # debug
+        print(f'croom_value={croom_value}') # debug
+
+        
+        # Events
+        if croom_event is None:
+            break
+        elif croom_event == shot['msg_cancel']:
+            break
+        
+        if croom_value['status_NONE']:
+            disable_radios = True
+        else:
+            disable_radios = False
+            if croom_value['radio_other']:
+                deny_custom_input = False
+            else:
+                deny_custom_input = True
+            
+        
+        
+
+    
+    create_new_room.close()
+    return ['lol', 'lol', 'lol', 'lol', 'lol']
 
 
 
@@ -1199,10 +1247,10 @@ def popup_show_hospital_info(**kwargs):
                         # Add to shot['hospital'] dict
                         if not add_hospital_section(the_candidate_is, the_candidate):
                             popup_some_error(already_exists_error)
-            elif hosp_info_event == add_rooms_button:
+            elif hosp_info_event == 'add_rooms_button':
                 print('will run popup_new_room() TODO')
                 
-#                room_id, room_dep, room_bld, room_uniq, status = popup_new_room(hospital_buildings, hospital_departments)
+                room_id, room_dep, room_bld, room_uniq, status = popup_new_room(hospital_buildings, hospital_departments)
                 
                 
                 if create_new:
@@ -1462,13 +1510,13 @@ def popup_uinput_single_string(popup_query_type):
     if run_this_popup:
         uinput_popup_popup_layout = [
                                     [sg.T(uinput_popup_purpose)],
-                                    [sg.T(f"{uinput_popup_pretext}: "), sg.InputText(uinput_popup_defaults, key=uinput_popup_keyname, size=(50,1))],
+                                    [sg.T(f"{uinput_popup_pretext}: "), sg.InputText(uinput_popup_defaults, key=uinput_popup_keyname, enable_events=True, size=(50,1))],
                                     [sg.Button(uinput_popup_button_doit), sg.Button(uinput_popup_button_cancel)]
                                     ]
         
-        do_run_this_popup = sg.Window(uinput_popup_title, layout=uinput_popup_popup_layout, margins=(2, 2), resizable=False, return_keyboard_events=True, keep_on_top=True)
+        popup_query_user = sg.Window(uinput_popup_title, layout=uinput_popup_popup_layout, margins=(2, 2), resizable=False, return_keyboard_events=True, keep_on_top=True)
         while True:
-            uchname_event, uchname_vals = do_run_this_popup.read()
+            uchname_event, uchname_vals = popup_query_user.read()
             
             if uchname_event is None:
                 break
@@ -1501,7 +1549,7 @@ def popup_uinput_single_string(popup_query_type):
  #                       else:
  #                           run_this_popup = False
                 break
-        do_run_this_popup.close()
+        popup_query_user.close()
     
     # This is probably meaningless
     return run_this_popup # TODO rename this bollock
@@ -2056,11 +2104,15 @@ def set_gui_strings(language):
     shot['msg_hospital_room_indiv'] = 'Add individual rooms separated by comma.'
     shot['msg_hospital_room_range'] = 'Add a range of rooms by using a hyphen, e.g. 1-100.'
     shot['msg_hospital_room_status'] = 'Status'
+    shot['msg_hospital_room_status_title'] = 'Optional room status'
     shot['msg_hospital_room_status_none'] = 'None'
     shot['msg_hospital_room_status_contaminated'] = 'Contaminated'
     shot['msg_hospital_room_status_atrisk'] = 'At risk'
     shot['msg_hospital_room_status_empty'] = 'Empty'
     shot['msg_hospital_room_status_niu'] = 'Not in use'
+    shot['msg_hospital_room_status_other'] = 'Other'
+    shot['msg_hospital_room_status_custom'] = 'Custom status'
+    shot['msg_hospital_room_status_spec'] = 'Specify' # Used with Other
     
     # Medical strings
     # TODO
