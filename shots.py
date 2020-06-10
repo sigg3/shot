@@ -76,6 +76,7 @@ shot = {}
 outbreak_filename = None
 shot_config_file = Path.cwd()/Path('settings.ini') # TODO: find out how to do this XDG + windows safe
 default_language_setting = 'English'
+#default_language_setting = 'Norwegian'
 hospital = {}
 
 
@@ -962,6 +963,9 @@ def popup_show_hospital_info(**kwargs):
             else:
                 room_coverage = [ f"{(x/rooms_in_total)*100:0.1f}%" for x in [ rooms_in_buildings, rooms_in_departments] ]
             
+            # Room status indicator
+            # Number of rooms that are infected (%)
+            # read from: hospital[hospital_id][unique_room_id]['status'] = None
 
 
     # Pertinent strings
@@ -979,23 +983,34 @@ def popup_show_hospital_info(**kwargs):
     # shot['msg_hospital_building_add'] = 'Add building'       
        
         
-        if number_of_departments == 0 or number_of_buildings == 0:
-            list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
-        elif rooms_in_total == 0:
+        if rooms_in_total == 0:
             list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
+        elif number_of_departments == 0 or number_of_buildings == 0:
+            list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
         else:
-            list_rooms_line = ' '
+            bld_conjug = shot['msg_hospital_building'] if number_of_buildings == 1 else shot['msg_hospital_buildings']
+            dep_conjug = shot['msg_hospital_department'] if number_of_departments == 1 else shot['msg_hospital_departments']
+            room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
+            list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug}, {number_of_departments} {dep_conjug}, {rooms_in_total} {room_conjug}"
         
-        
-        # TODO
-        #list_rooms_line = [sg.T(f"{shot['msg_hospital_no_rooms']}", size=(tsize_long+tsize_short,1)), sg.Button(shot['msg_hospital_rooms_add'], key='addme_som_rooms_pls')]
-        
-        
+           
         # Disable/enable View Buildings button
         view_blds_disabled = False if number_of_rooms_in_buildings > 0 else True
         view_deps_disabled = False if number_of_rooms_in_departments > 0 else True    
         view_room_disabled = False if (number_of_rooms_in_departments > 0) or (number_of_rooms_in_buildings > 0) else True
         add_rooms_disabled = False if (number_of_departments > 0) and (number_of_buildings > 0) else True
+        
+        
+        # Do estimate of infected rooms
+        if rooms_in_total == 0:
+            rooms_with_deviating_status = []
+            est_contaminated_rooms_int = 0
+            est_contaminated_rooms_per = '0.0%'
+        else:
+            rooms_with_deviating_status = [ x[0] for x in shot['hospital'].items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+            est_contaminated_rooms_int = len(rooms_with_deviating_status)
+            est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"
+        
         
         # Buildings
         table_buildings = [
@@ -1010,7 +1025,11 @@ def popup_show_hospital_info(**kwargs):
                             ]
         
         # Rooms
-        table_rooms = [[sg.T(' ', size=tsize_cont), sg.Button(shot['msg_hospital_rooms_add'], size=tsize_titl, key='add_rooms_button', disabled=add_rooms_disabled), sg.Button('Room Editor', size=tsize_titl, key='view_rooms_button', disabled=view_room_disabled), sg.T(' ', size=tsize_titl)]] # TODO weird thing with sizes here...? Or not?
+        table_rooms = [
+                       [sg.T(f"{shot['msg_hospital_rooms_contaminated']}:", size=tsize_cont), sg.T(f"{est_contaminated_rooms_int} ({est_contaminated_rooms_per})", size=tsize_titl), sg.T(' ', size=tsize_titl), sg.T(' ', size=tsize_cont)],
+                       [sg.T(' ', size=tsize_cont), sg.Button(shot['msg_hospital_rooms_add'], key='add_rooms_button', disabled=add_rooms_disabled), sg.Button(shot['settings_hospital_rooms'], key='view_rooms_button', disabled=view_room_disabled)]
+                       ]
+        
         
         
         # Administrative / log
@@ -1023,7 +1042,7 @@ def popup_show_hospital_info(**kwargs):
             
         
         hospital_info_win = [
-                            [sg.T(hospital_name)], # perhaps make this big and bold?
+                            [sg.T(hospital_fullname)], # perhaps make this big and bold?
                             [sg.T(f"{shot['msg_hospital_purpose']}\n{shot['msg_hospital_overview']}")],
                             [sg.T(list_rooms_line, key='room_conditional_text')],
                             [sg.Frame(layout=[[sg.Col(table_adminfo)]], title=f"{shot['msg_log']}")],
@@ -1152,7 +1171,10 @@ def popup_show_hospital_info(**kwargs):
             elif rooms_in_total == 0:
                 list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
             else:
-                list_rooms_line = ' '
+                bld_conjug = shot['msg_hospital_building'] if number_of_buildings == 1 else shot['msg_hospital_buildings']
+                dep_conjug = shot['msg_hospital_department'] if number_of_departments == 1 else shot['msg_hospital_departments']
+                room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
+                list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug}, {number_of_departments} {dep_conjug}, {rooms_in_total} {room_conjug}"
                 
             
             # Update GUI stringsand fields
@@ -1235,7 +1257,7 @@ def popup_select_hospital():
     select_hospital_win = [
                           [sg.T(f"{shot['msg_hospital_select']}\n{hosp_select_filler_text}\n")],
                           [sg.Radio('From existing:', "input_use_existing_hospital", key='hospital_selector_useexisting', default=use_existing_default, disabled=disable_existing),  sg.Combo(list_of_available_hospitals, key='hospital_selected_from_existing', default_value=default_selection, disabled=disable_existing)],
-                          [sg.Radio('Create new', "input_create_new_hospital", key='hospital_selector_donew', default=use_createnew_default)],
+                          [sg.Radio(shot['msg_hospital_create'], "input_create_new_hospital", key='hospital_selector_donew', default=use_createnew_default)],
                           [sg.Button(button_doit), sg.Button(button_cancel)]
                           ]
     select_hospital = sg.Window('Select hospital', layout=select_hospital_win, margins=(2, 2), resizable=True, return_keyboard_events=True, keep_on_top=True)
@@ -1930,6 +1952,7 @@ def set_gui_strings(language):
     shot['msg_hospital_rooms_add'] = 'Add rooms'
     shot['msg_hospital_rooms_req'] = 'Adding rooms requires one building and one department.'
     shot['msg_hospital_rooms_coverage'] = 'Coverage' # how many rooms are spoken of
+    shot['msg_hospital_rooms_contaminated'] = 'Contaminated rooms (estimate)'
     
     
     # Medical strings
@@ -2031,6 +2054,37 @@ def set_gui_strings(language):
         shot['err_no_headers'] = 'Feil filtype. Filen har ingen overskrifter.'
         shot['err_input_notafile'] = 'Feil objekt. Inndata er ikke en fil.'
         
+        
+        
+        # Hospital admin strings
+        shot['msg_hospital_no_hospitals'] = 'Det er ikke lagt inn noe sykehus.'
+        shot['msg_hospital_no_buildings'] = 'Det er ikke lagt inn noen bygninger'
+        shot['msg_hospital_no_departments'] = 'Det er ikke lagt inn noen avdelinger.'
+        shot['msg_hospital_no_rooms'] = 'Det er ikke lagt inn noen rom.'
+        shot['msg_hospital_create'] = 'Lag sykehus'
+        shot['msg_hospital_purpose'] = 'Ved å registrere utbrudd av infeksjoner i bygning, avdeling og rom får man en effektiv sporing og automatisk varmekart.'
+        shot['msg_hospital_overview'] = 'Et sykehus består av bygninger, avdelinger og rom.'
+        shot['msg_hospital_select'] = 'Velg sykehus'
+        shot['msg_hospital_name'] = 'Navn på sykehus'
+        shot['msg_hospital_name_purpose'] = 'Navnet på sykehuset slik det brukes i dagligtalen'
+        shot['msg_hospital_full_name'] = 'Offentlig tittel'
+        shot['msg_hospital_full_name_purpose'] = 'Full juridisk og administrativ tittel til sykehuset (for grafer og eksport)'
+        shot['msg_hospital_department'] = 'Avdeling' # unit ..?
+        shot['msg_hospital_departments'] = 'Avdelinger'
+        shot['msg_hospital_department_add'] = 'Legg til avdeling'
+        shot['msg_hospital_department_purpose'] = 'Avdelinger benyttes for å spore utbrudd i adminstrativt og logistisk rom.'
+        shot['msg_hospital_department_name'] = 'Navn'
+        shot['msg_hospital_building'] = 'Bygning'
+        shot['msg_hospital_buildings'] = 'Bygninger'
+        shot['msg_hospital_building_add'] = 'Legg til bygg'
+        shot['msg_hospital_building_purpose'] = 'Bygninger benyttes til å spore utbrudd i det fysiske rom. De huser avdelinger og enkeltrom.'
+        shot['msg_hospital_building_name'] = 'Navn'
+        shot['msg_hospital_room'] = 'Rom'
+        shot['msg_hospital_rooms'] = 'Rom'
+        shot['msg_hospital_rooms_add'] = 'Legg til rom'
+        shot['msg_hospital_rooms_req'] = 'For å kunne legge til rom kreves det en bygning og en avdeling.'
+        shot['msg_hospital_rooms_coverage'] = 'Dekning' # how many rooms are spoken of
+        shot['msg_hospital_rooms_contaminated'] = 'Kontaminerte rom (estimat)'
         
         # Finally, append this language to list (towards the bottom of the function)
         
