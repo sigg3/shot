@@ -663,65 +663,21 @@ def popup_new_room(hospital_buildings, hospital_departments):
     cell_text = (22,1)
     cell_radio = (18,1)
     
-    # Create columns
+    
+    # Room selector
     new_rooms_rows = [
                      [sg.T(f"{shot['msg_hospital_building']}:", size=cell_text), sg.T(f"{shot['msg_hospital_department']}:", size=cell_text), sg.T(f"{shot['msg_hospital_room']} / {shot['msg_hospital_rooms']}:", size=cell_text)],
                      [sg.Combo((list_of_buildings),default_value=None, size=(20, 1)),sg.Combo((list_of_departments),default_value=None, size=(20, 1)), sg.In('', size=cell_combo)]
                      ]
-
     
-    # Do 2x2 matrix with radions
-    # nut really 3x2 columns, because the 6th one must also show input field enabled if Other/specify is chosen. # TODO
-    
-    
-#    set_status_row = [
-            
-    
+    # Room status (optional)
     set_status_row = [
                      [sg.CBox(shot['msg_hospital_room_status_none'], default=True, key='status_NONE', enable_events=True)],
                      [sg.Radio(shot['msg_hospital_room_status_empty'], 'status radios', size=cell_radio, key='radio_empty', enable_events=True, disabled=True), sg.Radio(shot['msg_hospital_room_status_niu'], 'status radios', size=cell_radio, key='radio_niu', enable_events=True, disabled=True), sg.Radio(shot['msg_hospital_room_status_atrisk'], 'status radios', key='radio_atrisk', enable_events=True, disabled=True)],
                      [sg.Radio(shot['msg_hospital_room_status_contaminated'], 'status radios', size=cell_radio, key='radio_contam', enable_events=True, disabled=True), sg.Radio(shot['msg_hospital_room_status_custom'], 'status radios', size=cell_radio, key='radio_other', enable_events=True, disabled=True), sg.T(f"{shot['msg_hospital_room_status_spec']}:", key='specify_title', text_color='grey'), sg.In('', key='custom_status', size=cell_text, disabled=True)]
                      ]
     
-    
-    # Combo(values,
-    # default_value=None,
-    # size=(None, None),
-    # auto_size_text=None,
-    # background_color=None,
-    # text_color=None,
-    # change_submits=False,
-    # enable_events=False,
-    # disabled=False,
-    # key=None,
-    # pad=None,
-    # tooltip=None,
-    # readonly=False,
-    # font=None,
-    # visible=True,
-    # metadata=None)
-
-
-    # Checkbox(text,
-    # default=False,
-    # size=(None, None),
-    # auto_size_text=None,
-    # font=None,
-    # background_color=None,
-    # text_color=None,
-    # change_submits=False,
-    # enable_events=False,
-    # disabled=False,
-    # key=None,
-    # pad=None,
-    # tooltip=None,
-    # visible=True,
-    # metadata=None)
-    
-    
-  #  [sg.Frame(layout=[[sg.Col(table_rooms)]], title=f"{shot['msg_hospital_rooms']}")],
-    
-    
+    # Create window layout
     create_new_room_win = [
                           [sg.T(f"{shot['msg_hospital_room_whatis']}\n{shot['msg_hospital_room_indiv']} {shot['msg_hospital_room_range']}")],
                           [sg.Col(new_rooms_rows)],
@@ -729,27 +685,42 @@ def popup_new_room(hospital_buildings, hospital_departments):
                           [sg.Button('OK'), sg.Button(shot['msg_cancel'])]
                           ]
     
-    # use this as title for poup = shot['msg_hospital_rooms_add']
+    # Create window object
     create_new_room = sg.Window(shot['msg_hospital_rooms_add'], layout=create_new_room_win, margins=(2, 2), resizable=False, keep_on_top=True, return_keyboard_events=True, finalize=True)
     
-    # by default, custom input and radios are disabled
+    # Sane defaults for GUI status changes
+    # By default custom input and the radios are disabled (greyed out). We want a status == None by default
     deny_custom_input = True
     disable_radios = True
     loop_keys = ['radio_empty', 'radio_niu', 'radio_atrisk', 'radio_contam', 'radio_other', 'custom_status']
     
+    
+    
+    # TODO argparse:
+    # On croom_event=OK, check these:
+    #  TODO untangle these:
+    # croom_value={0: 'Hovedbygget', 1: '', 2: '1-14', 'status_NONE': True, 'radio_empty': True, 'radio_niu': False, 'radio_atrisk': False, 'radio_contam': False, 'radio_other': False, 'custom_status': ''}
+    # 
+    # remember to convert range_to_ints, ints_to_ranges
+    # ^^ write function for that you lazy bastard
+    
+
     while True:        
         # GUI Status changes
         if disable_radios:
             for status_type in loop_keys:
                 create_new_room[status_type].Update(disabled=True)
             create_new_room['specify_title'].Update(text_color='grey')
+            create_new_room['custom_status'].Update('')
         else:
             for status_type in loop_keys:
-                if status_type != 'custom_status': create_new_room[status_type].Update(disabled=False)
+                if 'custom' in status_type: continue
+                create_new_room[status_type].Update(disabled=False)
             
             if deny_custom_input:
                 create_new_room['custom_status'].Update(disabled=True)
                 create_new_room['specify_title'].Update(text_color='grey')
+                create_new_room['custom_status'].Update('')
             else:
                 create_new_room['custom_status'].Update(disabled=False)
                 create_new_room['specify_title'].Update(text_color='black')
@@ -775,11 +746,12 @@ def popup_new_room(hospital_buildings, hospital_departments):
             else:
                 deny_custom_input = True
             
-        
-        
-
+    
     
     create_new_room.close()
+    
+    # TODO append items to list and return as shown below ...
+    
     return ['lol', 'lol', 'lol', 'lol', 'lol']
 
 
