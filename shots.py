@@ -44,6 +44,14 @@ from pathlib import Path
 #    HOWEVER, it could be a huge timesaver ..
 # 
 
+# TO PONDER TOO
+# hospitals lend themselves to objectification (use a hospital class)
+# there are performance considerations on different sides here:
+# by using dicts we are effectively using hashmaps (fast), perhaps with some memory limitations ... (?) (runtime performance)
+# by using objects we relinquish some of that speed (maybe?) for easier maintenance (coding performance)
+# In general, doing manual dictionary work should be avoided and done by functions
+# ... begging the question then, why not write a class instead?
+
 
 # TODO not sure we need time, when 'datetime' fits our needs
 #   >>> datetime.datetime.now().isoformat().split(sep='T')
@@ -767,13 +775,33 @@ def popup_new_room(hospital_buildings, hospital_departments):
             break
         elif croom_event == 'add_room_exec':
             # Only required field is room number
-            pass
+            sel_bld = croom_value[0]
+            sel_dep = croom_value[1]
+            sel_rooms = croom_value[2]
+            sel_status = None # default
             
-            croom_event=add_room_exec
-            croom_value={0: 'asdasd', 1: 'sfsdfsdf', 2: '1-199', 'status_NONE': True}
+            # Convert room(s) string to list of ints
+            if sel_rooms.isdigit():
+                sel_rooms = [ int(sel_rooms) ] # single room list
+            else:
+                pass
+                
+                # parse comma separated string or ranges or both into int list
+                # TODO
+                
+                # iterate over comma-separated values in rooms string from configparser
+                for room_id in rooms.split(sep=','):
+                            if room_id.isdigit():
+                                register_unique_room(room_id) # single room (not a range), add directly   
+                            elif type(room_id) is str and '-' in room_id:
+                                try:
+                                    rep_beg, rep_end = int(room_id.split(sep='-'))
+                                    for room_x in range(int(rep_beg), int(rep_end)+1): register_unique_room(room_x)  # add single room derived from range ^
+                                except:
+                                    continue # in case there's garbage in the file, we won't add it
             
             
-            
+                
         
         # Set visuals
         if not create_new:
