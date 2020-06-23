@@ -560,6 +560,133 @@ def gender_from_fnr(fnr):
 # Language functions
 
 
+# Hospital management functions
+
+def room_list_from_arbitray_str(input_str):
+    """
+    Takes an arbitrary "room list string" from e.g. popup_new_room() containing a string
+    that feature a comma separated list of digits or ranges (including alphanumeric ranges).
+    This is used in "unpacking" configuration files containing human-readable (and writeable) ranges,
+    for example: 1-3, A104-A199, A200-B200 (within certain conditions).
+    returns a list object 'formatted_list', so call using "my_saved_list, my_skipped_items = func(input_str)" format
+    also returns a second list item 'skipped_items' for log or graphical warning that items were skipped
+    check a returned object using e.g. len(my_saved_list) > 0
+    """
+    formatted_list = []
+    skipped_items = []
+    
+    # Note, we're skipping alnum support for Norwegian (and other chars beyond Z in English alphabet), the gaps are too big:
+    # In [76]: ord('Z') == 90
+    # In [77]: ord('Æ') == 198
+    # In [78]: ord('Ø') == 216
+    # In [79]: ord('Å') == 197
+    
+    
+    if type(input_str) is str:
+        for single_room in input_str.split(sep=','):
+            if input_str.isdigit():
+                formatted_list.append(single_room) # single room (recommended practice)
+            elif '-' in single_room:
+                split_beg, split_end = single_room.split(sep='-')
+                if split_beg.isdigit() and split_end.isdigit():
+                    # numeric range (recommended practice)
+                    formatted_list += [ str(room_id) for room_id in range(int(split_beg)), int(split_end)+1) ]
+                elif (split_beg[0].isalpha() and split_end[0].isalpha()) and (split_beg[1:].isdigit() and split_beg[1:].isdigit()):
+                    # simple alpha(numeric) range
+                    #
+                    # If the start is alpha and "the rest" is a digit, we can work with it alphabetically, assuming beginning alpha is prior to ending alpha
+                    #
+                    # Please note that we are guessing the digit sizes based on the input; 
+                    #   e.g. A20-B20 will assume that there are 99 rooms in A and B (A01..A99)
+                    # whereas
+                    #   e.g. A200-B20 will assume that there are 999 rooms in A and 999 rooms in B (rendering e.g. B20 a "B020")
+                    # 
+                    # Signify desired size by using preceeding zeroes: A020-B020 will assume 999 rooms in A and B (and add 20..999 in A and 1-20 in B)
+                    #
+                    # This is the limit of what we can be expected to support based on arbitrary user input.
+                    
+                    concat_begend = split_beg[0] + split_beg[1]
+                    if list(concat_begend) == sorted(concat_begend): # check whether we're alphabetical (e.g. does the first letter (A) come before the second letter (B) ?)
+                        # Get length to establish padding/preceding zeroes (if any)
+                        # e.g. if len is 3 and value is 20, we print 020, else just 20.
+                        output_len = len(split_beg[1:])
+                        if len(split_end[1:]) > output_len: output_len = len(split_end[1:])
+                        
+                        # Iterate over symbols between the two inputs (e.g. A-Z), including the last one (including Z) up until int(split_end):
+                        # Using chr() and ord() this is just beautiful
+                        # In [56]: ord(split_beg[0])                                                   
+                        # Out[56]: 65
+                        #
+                        # In [57]: chr(ord(split_beg[0])+1)                                            
+                        # Out[57]: 'B'
+                        #
+                        # In [58]: chr(ord(split_beg[0])+1)                                            
+                        # Out[58]: 'B'
+                        #
+                        # In [59]: split_end[0]                                                   
+                        # Out[59]: 'B'
+                        #
+                        # In [60]: ord(split_end[0])                                                   
+                        # Out[60]: 66
+                        
+                        # To check that we're in A-Z a-z range, respectively
+                        accepted_ranges = [ x for x in range(65, 91) ] # A-Z (ends on 90)
+                        accepted_ranges += [ x for x in range(97, 123) ] # a-z (ends on 122)
+                        
+                        
+                        for symbol_id in range(ord(split_beg[0]),ord(split_end[0])+1):
+                            if symbol_id in accepted_ranges:
+                                symbol_is = chr(symbol_id) # alphabet char of symbol_id
+                                
+                                # Establish numeric range
+                                item_min = 0
+                                item_max = int('9' * output_len) # This gives us 999 for len 3
+                                if symbol_id == ord(split_beg[0]): item_min = int(split_beg[1:])
+                                if symbol_id == ord(split_end[0]): item_max = int(split_end[1:]) # E.g. greatest one is 20 in 020
+                                
+                                # Add items to formatted list
+                                formatted_list += [ str(symbol_is+f"{room_id:0{output_len}d}") for room_id in range(item_min, item_max+1) ] # using python 3.6+ notation
+                    else:
+                        skipped_items.append(single_room) # simple alphanumeric but not alphabetical (e.g. "B200-A34") => can't deal with it
+                else:
+                    # check if complex alphanumeric
+                    # If the tail parts are ints and the preceeding parts (non-digits) are identical (e.g. HS10B100-HS10B399), we have a complex alphanumeric we can deal with (HS10B treated as mere symbols)
+                    # What we do here is reverse the string char by char until we don't get a digit. Everything after that is pretext (e.g. HS10B symbol).
+                    
+                    for str_to_chk in split_beg, split_end:
+                        room_is_digit = True
+                        my_numbers = ''
+                        my_pretext = ''
+                        for inchar in str_to_chk[::-1]:
+                            if not inchar.isdigit(): room_is_int = False
+                            if room_is_int:
+                                my_numbers += inchar
+                            else:
+                                my_pretext += inchar
+                        
+                        if str_to_chk == split_beg:
+                            split_beg_numbers = my_numbers[::-1]
+                            split_beg_pretext = my_pretext[::-1]
+                        else:
+                            split_end_numbers = my_numbers[::-1]
+                            split_end_pretext = my_pretext[::-1]
+                    
+                    if (split_beg_pretext == split_end_pretext) and (split_beg_numbers.isdigit() and split_end_numbers.isdigit()) and (int(split_beg_numbers) < int(split_end_numbers)):
+                        # Need this to establish zero padding
+                        output_len = len(split_beg[1:])
+                        if len(split_end[1:]) > output_len: output_len = len(split_end[1:])
+                        
+                        # Add to output list
+                        formatted_list += [ str(split_beg_pretext+f"{room_id:0{output_len}d}") for room_id in range(int(split_beg_numbers), int(split_end_numbers)) ] # python 3.6 format notation
+                    else:
+                        skipped_items.append(single_room) # can't establish an acceptable pattern
+            else:
+                skipped_items.append(single_room) # not alphabetical, can't deal with it
+        
+    
+    return formatted_list, skipped_items
+
+
 
 # GUI functions
 #
@@ -779,26 +906,27 @@ def popup_new_room(hospital_buildings, hospital_departments):
             sel_dep = croom_value[1]
             sel_rooms = croom_value[2]
             sel_status = None # default
+            sel_room_list = []
             
             # Convert room(s) string to list of ints
             if sel_rooms.isdigit():
-                sel_rooms = [ int(sel_rooms) ] # single room list
+                sel_room_list = [ int(sel_rooms) ] # single room list
             else:
                 pass
                 
-                # parse comma separated string or ranges or both into int list
-                # TODO
+                # TODO refer to room_list_from_arbitrary_str()
+                            
                 
                 # iterate over comma-separated values in rooms string from configparser
-                for room_id in rooms.split(sep=','):
-                            if room_id.isdigit():
-                                register_unique_room(room_id) # single room (not a range), add directly   
-                            elif type(room_id) is str and '-' in room_id:
-                                try:
-                                    rep_beg, rep_end = int(room_id.split(sep='-'))
-                                    for room_x in range(int(rep_beg), int(rep_end)+1): register_unique_room(room_x)  # add single room derived from range ^
-                                except:
-                                    continue # in case there's garbage in the file, we won't add it
+                # for room_id in rooms.split(sep=','):
+                            # if room_id.isdigit():
+                                # register_unique_room(room_id) # single room (not a range), add directly   
+                            # elif type(room_id) is str and '-' in room_id:
+                                # try:
+                                    # rep_beg, rep_end = int(room_id.split(sep='-'))
+                                    # for room_x in range(int(rep_beg), int(rep_end)+1): register_unique_room(room_x)  # add single room derived from range ^
+                                # except:
+                                    # continue # in case there's garbage in the file, we won't add it
             
             
                 
