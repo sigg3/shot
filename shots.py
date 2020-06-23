@@ -572,15 +572,10 @@ def room_list_from_arbitray_str(input_str):
     also returns a second list item 'skipped_items' for log or graphical warning that items were skipped
     check a returned object using e.g. len(my_saved_list) > 0
     """
+    
+    # establish return objects
     formatted_list = []
     skipped_items = []
-    
-    # Note, we're skipping alnum support for Norwegian (and other chars beyond Z in English alphabet), the gaps are too big:
-    # In [76]: ord('Z') == 90
-    # In [77]: ord('Æ') == 198
-    # In [78]: ord('Ø') == 216
-    # In [79]: ord('Å') == 197
-    
     
     if type(input_str) is str:
         for single_room in input_str.split(sep=','):
@@ -632,6 +627,8 @@ def room_list_from_arbitray_str(input_str):
                         # To check that we're in A-Z a-z range, respectively
                         accepted_ranges = [ x for x in range(65, 91) ] # A-Z (ends on 90)
                         accepted_ranges += [ x for x in range(97, 123) ] # a-z (ends on 122)
+                        accepted_ranges += [ 198, 216, 197, 230, 248, 229 ] # Norwegian last letters
+                        # + add any of your own here, if applicable                        
                         
                         
                         for symbol_id in range(ord(split_beg[0]),ord(split_end[0])+1):
