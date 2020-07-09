@@ -585,7 +585,7 @@ def room_list_from_arbitray_str(input_str):
                 split_beg, split_end = single_room.split(sep='-')
                 if split_beg.isdigit() and split_end.isdigit():
                     # numeric range (recommended practice)
-                    formatted_list += [ str(room_id) for room_id in range(int(split_beg)), int(split_end)+1) ]
+                    formatted_list += [ str(room_id) for room_id in range(int(split_beg), int(split_end)+1) ]
                 elif (split_beg[0].isalpha() and split_end[0].isalpha()) and (split_beg[1:].isdigit() and split_beg[1:].isdigit()):
                     # simple alpha(numeric) range
                     #

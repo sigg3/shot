@@ -1,0 +1,8 @@
+1. make sure pyenv version is correct
+$ pyenv versions
+
+2. Use pip3 freeze to create requirements
+$ pip3 freeze > requirements.txt
+
+3. To install on client, do
+$ pip3 install -r requirements.txt
