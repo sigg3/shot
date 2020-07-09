@@ -376,7 +376,9 @@ def read_config_from(config_file):
     def register_unique_room(input_room_id):
         """
         Sub function to make sure room IDs are unique.
-        Many buildings in Norway have room 101 (first floor, second room..), so we need something unique.
+        Many buildings in Norway have room 101 (first floor, second room..), so we need something more unique.
+        Format is: <hospital>_<building>_<room_identifier>
+        Each room entry is a dictionary containing status, department and building.
         """
         hospital[hospital_id][hosp_element][subsect].append(int(input_room_id)) # single room (not a range), add directly        
         unique_room_id = (str(hospital_id), str(subsect), str(input_room_id))
@@ -783,7 +785,7 @@ def popup_new_room(hospital_buildings, hospital_departments):
     Rooms are first and foremost the smallest location info for any single patient.
     Rooms belongs physically to a building and logically to a department.
     # Legend: popup_new_room(shot['hospital']['bld'], shot['hospital']['dep'])
-    returns information added in order: room_id, room_dep, room_bld, room_uniq, status
+    returns information added in order: room_id_list, room_dep, room_bld, room_uniq, status
     """
     # Get the list from cli args
     list_of_departments = list(hospital_departments)
@@ -847,23 +849,6 @@ def popup_new_room(hospital_buildings, hospital_departments):
     disable_radios = True
     loop_keys = ['radio_empty', 'radio_niu', 'radio_atrisk', 'radio_contam', 'radio_other', 'custom_status']
     
-    
-    
-    # TODO argparse:
-    # On croom_event=OK, check these:
-    #  TODO untangle these:
-    # croom_value={0: 'Hovedbygget', 1: '', 2: '1-14', 'status_NONE': True, 'radio_empty': True, 'radio_niu': False, 'radio_atrisk': False, 'radio_contam': False, 'radio_other': False, 'custom_status': ''}
-    # 
-    # remember to convert range_to_ints, ints_to_ranges
-    # ^^ write function for that you lazy bastard
-    
-    
-    # croom_event=add_room_exec
-    # croom_value={0: 'Bygg 1', 1: 'Avdeling B', 2: '0-299', 'status_NONE': True, 'radio_empty': False, 'radio_niu': False, 'radio_atrisk': False, 'radio_contam': False, 'radio_other': False, 'custom_status': ''}
-
-    
-    
-    
 
     while True:
         if not create_new:
@@ -903,30 +888,35 @@ def popup_new_room(hospital_buildings, hospital_departments):
             sel_dep = croom_value[1]
             sel_rooms = croom_value[2]
             sel_status = None # default
-            sel_room_list = []
             
-            # Convert room(s) string to list of ints
-            if sel_rooms.isdigit():
-                sel_room_list = [ int(sel_rooms) ] # single room list
+            print('Will get room list using room_list_from_arbitrary_str(sel_rooms)')
+            print(f"where sel_rooms is: {sel_rooms}")
+            print(f"building: {sel_bld}")
+            print(f"department: {sel_dep}")
+
+     #       selected_rooms = [] # debug
+     #       skipped_rooms = [] # debug
+            
+            selected_rooms, skipped_rooms = room_list_from_arbitray_str(sel_rooms)
+            
+            print(f"selected_rooms = {selected_rooms}")
+            print(f"skipped_rooms = {skipped_rooms}")
+            
+            if skipped_rooms and selected_rooms: # only show "added N rooms" if we are adding rooms, else all are skipped
+                if len(skipped_rooms) == 1:
+                    skipped_rooms_info = f"{shot['msg_couldnotadd']} 1 {shot['msg_hospital_room']}."
+                elif len(skipped_rooms) > 20:
+                    skipped_rooms_info = f"{shot['msg_couldnotadd']} {len(skipped_rooms)} {shot['msg_hospital_rooms']}."
+                else:
+                    skipped_rooms_info = f"{shot['msg_couldnotadd']} {len(skipped_rooms)} {shot['msg_hospital_rooms']}:\n{', '.join(skipped_rooms)}"
+                popup_some_error(skipped_rooms_info)
+            
+            if selected_rooms:
+                sg.popup(f"{len(selected_rooms)} {shot['msg_hospital_room_added']}", title=shot['msg_hospital_rooms_add'], keep_on_top=True) # TODO create information popup?
+                break
             else:
-                pass
-                
-                # TODO refer to room_list_from_arbitrary_str()
-                            
-                
-                # iterate over comma-separated values in rooms string from configparser
-                # for room_id in rooms.split(sep=','):
-                            # if room_id.isdigit():
-                                # register_unique_room(room_id) # single room (not a range), add directly   
-                            # elif type(room_id) is str and '-' in room_id:
-                                # try:
-                                    # rep_beg, rep_end = int(room_id.split(sep='-'))
-                                    # for room_x in range(int(rep_beg), int(rep_end)+1): register_unique_room(room_x)  # add single room derived from range ^
-                                # except:
-                                    # continue # in case there's garbage in the file, we won't add it
-            
-            
-                
+                popup_some_error(f"{shot['msg_hospital_room_noadded']}")        
+        
         
         # Set visuals
         if not create_new:
@@ -2225,6 +2215,7 @@ def set_gui_strings(language):
     shot['msg_time'] = 'Time'
     shot['msg_timestamp'] = 'Timestamp'
     shot['msg_already_exists'] = 'already exists' # as in error message: {some thing} already exists
+    shot['msg_couldnotadd'] = 'Could not add'
 
     # User related strings
     shot['msg_user'] = 'User'
@@ -2277,6 +2268,8 @@ def set_gui_strings(language):
     shot['msg_hospital_room_whatis'] = 'Rooms are the smallest units of the hospital.'
     shot['msg_hospital_room_indiv'] = 'Add individual rooms separated by comma.'
     shot['msg_hospital_room_range'] = 'Add a range of rooms by using a hyphen, e.g. 1-100.'
+    shot['msg_hospital_room_added'] = 'rooms were added.' # "N rooms were added."
+    shot['msg_hospital_room_noadded'] = 'No rooms were added.'
     shot['msg_hospital_room_status'] = 'Status'
     shot['msg_hospital_room_status_title'] = 'Optional room status'
     shot['msg_hospital_room_status_none'] = 'None'
@@ -2290,7 +2283,6 @@ def set_gui_strings(language):
     
     # Medical strings
     # TODO
-    
     
     
     
@@ -2612,11 +2604,11 @@ menu_menu = [sg.Menu(menu_layout)]
                # sg.Button('', image_data=shot['icon_bin_print'], button_color=(icon_bkg,icon_bkg), border_width=0, key=shot['icon_key_print'])
              # ]
 
-menu_icons = [ sg.Button('', image_data=shot['icon_bin_new'], border_width=0, key=shot['icon_key_new']),
-               sg.Button('', image_data=shot['icon_bin_open'], border_width=0, key=shot['icon_key_open']),
-               sg.Button('', image_data=shot['icon_bin_save'], border_width=0, key=shot['icon_key_save']),
-               sg.Button('', image_data=shot['icon_bin_list'], border_width=0, key=shot['icon_key_list']),
-               sg.Button('', image_data=shot['icon_bin_plot'], border_width=0, key=shot['icon_key_plot']),
+menu_icons = [ sg.Button('', image_data=shot['icon_bin_new'],   border_width=0, key=shot['icon_key_new']),
+               sg.Button('', image_data=shot['icon_bin_open'],  border_width=0, key=shot['icon_key_open']),
+               sg.Button('', image_data=shot['icon_bin_save'],  border_width=0, key=shot['icon_key_save']),
+               sg.Button('', image_data=shot['icon_bin_list'],  border_width=0, key=shot['icon_key_list']),
+               sg.Button('', image_data=shot['icon_bin_plot'],  border_width=0, key=shot['icon_key_plot']),
                sg.Button('', image_data=shot['icon_bin_image'], border_width=0, key=shot['icon_key_image']),
                sg.Button('', image_data=shot['icon_bin_print'], border_width=0, key=shot['icon_key_print'])
              ]

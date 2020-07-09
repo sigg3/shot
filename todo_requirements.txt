@@ -6,3 +6,8 @@ $ pip3 freeze > requirements.txt
 
 3. To install on client, do
 $ pip3 install -r requirements.txt
+
+
+# Should at least contain:
+PySimpleGUI==4.24.0
+pandas==1.0.5
