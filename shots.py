@@ -565,6 +565,16 @@ def gender_from_fnr(fnr):
 
 # Hospital management functions
 
+def arbitrary_str_from_room_list(input_list):
+    """
+    The opposite of room_list_from_arbitrary_str()
+    Returns a "calulated" human-readable string of list contents, e.g.
+    For ['A134', 'A135', 'A136', 'A138'], we'll get "A134-A136, A138" 
+    """
+    # TODO
+    pass
+    
+    
 def room_list_from_arbitray_str(input_str):
     """
     Takes an arbitrary "room list string" from e.g. popup_new_room() containing a string
@@ -890,14 +900,14 @@ def popup_new_room(hospital_buildings, hospital_departments):
             sel_rooms = croom_value[2]
             sel_status = None # default
             
-            print('Will get room list using room_list_from_arbitrary_str(sel_rooms)')
-            print(f"where sel_rooms is: {sel_rooms}")
-            print(f"building: {sel_bld}")
-            print(f"department: {sel_dep}")
-
+   #         print('Will get room list using room_list_from_arbitrary_str(sel_rooms)')
+   #         print(f"where sel_rooms is: {sel_rooms}")
+   #         print(f"building: {sel_bld}")
+   #         print(f"department: {sel_dep}")
+#
      #       selected_rooms = [] # debug
      #       skipped_rooms = [] # debug
-            
+ #           
             selected_rooms, skipped_rooms = room_list_from_arbitray_str(sel_rooms)
             
             print(f"selected_rooms = {selected_rooms}")
@@ -933,8 +943,7 @@ def popup_new_room(hospital_buildings, hospital_departments):
     # TODO append items to list and return as shown below ...
     
     # returns information added in order: room_id, room_dep, room_bld
-    
-    return ['lol', 'lol', 'lol']
+    return selected_rooms, sel_dep, sel_bld 
 
 
 
@@ -1060,8 +1069,10 @@ def popup_show_hospital_info(**kwargs):
     # If user hits Save/Create hospital, then these are stored in shot['hospital']
     # Otherwise, we want to destroy them (and create afresh upon new window)..
     hospital_info = {}
-    hospital_departments = {}
-    hospital_buildings = {}
+    hospital_info['dep'] = {}
+    hospital_info['bld'] = {}
+    hospital_departments = hospital_info['dep']
+    hospital_buildings = hospital_info['bld']
     
     
     if not create_new:
@@ -1117,14 +1128,14 @@ def popup_show_hospital_info(**kwargs):
             do_go_on = False
     
     
-    # Get local date and time from timestamps (human readable)
-    created_date, created_time = created_tstamp.split(sep='T')
-    changed_date, changed_time = updated_tstamp.split(sep='T')
-    
     
     # do_go_on workaround
     # This is lazy, but there's no point in building and displaying a window that will crash
     if do_go_on:
+        # Get local date and time from timestamps (human readable)
+        created_date, created_time = created_tstamp.split(sep='T')
+        changed_date, changed_time = updated_tstamp.split(sep='T')
+        
         
         if create_new:
             button_line = [sg.Button(button_doit), sg.Button(button_cancel)]
@@ -1388,6 +1399,7 @@ def popup_show_hospital_info(**kwargs):
             
             # Parse window events and execute
             if hosp_info_event is None or hosp_info_event == button_cancel:
+                do_go_on = False
                 break
             elif hosp_info_event == shot['msg_hospital_building_add'] or hosp_info_event == shot['msg_hospital_department_add']:
                 if hosp_info_event == shot['msg_hospital_building_add']:
@@ -1452,8 +1464,8 @@ def popup_show_hospital_info(**kwargs):
                     
                     # Add rooms to appropriate containers
                     for room_id in room_ids:
-                        hospital_info['dep'][room_dep].append(room_id)
-                        hospital_info['bld'][room_bld].append(room_id)
+                        hospital_departments[room_dep].append(room_id) # hospital_departments = hospital_info['dep']
+                        hospital_buildings[room_bld].append(room_id)   # hospital_buildings   = hospital_info['bld']
                         unique_room_id = '_'.join(str(hospital_name), str(room_bld), str(room_id))
                         hospital_info[unique_room_id] = {}
                         hospital_info[unique_room_id]['status'] = None
@@ -1464,13 +1476,16 @@ def popup_show_hospital_info(**kwargs):
                 else:
                     popup_some_error(f"0 {shot['msg_hospital_room_added'].lower()}.\n{shot['msg_couldnotadd'].capitalize()} {shot['msg_hospital_rooms'].lower()}")
                 
-            elif hosp_info_event == shot['msg_hospital_create']:
+            elif hosp_info_event == button_doit:
                 if number_of_departments == 0 and number_of_buildings == 0:
                     popup_some_error(f"{shot['msg_hospital_no_buildings']}\n{shot['msg_hospital_no_departments']}\n{shot['msg_hospital_rooms_req']}")
                 elif rooms_in_total == 0:
                     popup_some_error(f"{shot['msg_hospital_overview']} {shot['msg_hospital_no_rooms']}")
                 else:
-                    print('hospital create scenario TODO') # TODO
+                    if hosp_info_event == shot['msg_hospital_create']:
+                        print('hospital create scenario TODO') # TODO
+                    do_go_on = True # Save to "real" dict
+                    break
             
             
             # Post execute : Update numbers and fields
@@ -1539,11 +1554,16 @@ def popup_show_hospital_info(**kwargs):
         
         manage_hospital_win.close()
         
-    # Save local var 'hospital_info' to shot['hospital'] if so desired.
-    # The window has an OK/Create hospital and a Cancel button
-    # That means we can only SAVE IFF user hits save or create. Otherwise data must be destroyed.
-    # All calculations should be done one LOCAL VARS, so we can save it here (below) to appropriate dictionary (if desired)
-    # Otherwise, hospitals might soon end up with a lot of cruft, making the application less usable..
+        if do_go_on:
+            # Save local var 'hospital_info' to shot['hospital'] if so desired.
+            # The window has an OK/Create hospital and a Cancel button
+            # That means we can only SAVE IFF user hits save or create. Otherwise data must be destroyed.
+            # All calculations should be done one LOCAL VARS, so we can save it here (below) to appropriate dictionary (if desired)
+            # Otherwise, hospitals might soon end up with a lot of cruft, making the application less usable..
+            
+            pass # TODO
+        
+        
 
 def add_hospital_section(sub_type, sub_name):
     """
@@ -1574,7 +1594,7 @@ def popup_select_hospital():
     RADIO [*] Use existing: [ drop down ]
           [ ] Create new
           
-    Returns string containing name of selected hospital (or None) # This might be false info # TODO
+    Returns string containing name of selected hospital (or None)
     """
     
     # buttons
@@ -1647,13 +1667,10 @@ def popup_select_hospital():
     
     # TODO Not sure if this belongs here or elsewhere in the workflow
     # Returns string with name of hospital (or None)
-    if selected_hospital is None:
-        pass
-    elif selected_hospital == 'create_new':
+    if selected_hospital == 'create_new':
         popup_new_hospital('return_to_select_hospital')
     else:
-        pass
-        # TODO
+        return selected_hospital
     
 
 def popup_uinput_single_string(popup_query_type):
@@ -2020,6 +2037,8 @@ def tab_welcome(outbreak_filename):
     Returns list containing Welcome tab contents. Content is conditional on file being loaded.
     """
     
+    welcome_tab_spacer = ' ' * 500 # This is a workaround to avoid having an inner tab frame being smaller than the tab size.
+    
     if outbreak_filename is None:
         welcome_tab_filename = shot['msg_no_file_loaded']
         welcome_tab_loadfile = f"{shot['msg_no_file_loaded']} {shot['msg_no_file_tip']}"
@@ -2034,7 +2053,7 @@ def tab_welcome(outbreak_filename):
     
     # TODO
     shot['version'] = "0.01 alpha" # TODO set dict_version from global string atop
-    my_welcome_tab = [[sg.T(' ')],
+    my_welcome_tab = [[sg.T(welcome_tab_spacer)],
                       [sg.Image(filename=None, data=shot['icon_logo'], size=(120,120), pad=(2,2)), sg.T(f"Simple Hospital Outbreak Tracker\nA Free and Open Source Public Health Software Project\nCopyright (C) 2020, GNU GPL v.3. Version: {shot['version']}", font=('Sans serif', 16))],
                       [sg.T(f"\n{shot['tab']['tip']['welcome']}\n")],
                       [sg.T(welcome_tab_user_key, key='welcome_tab_username_infokey'), sg.T(welcome_tab_username, key='welcome_tab_username_infoval')],
@@ -2874,6 +2893,7 @@ gui_window_title_set = gui_window_title
 # Get screen size and determine sane dimensons
 screen_width, screen_height = sg.Window.get_screen_size()
 window_width = screen_width//3
+if window_width < 800: window_width = screen_width//2
 window_height = int(screen_height/1.5)
 
 window = sg.Window(gui_window_title, layout=layout, margins=(0, 0), size=(window_width,window_height), resizable=True, return_keyboard_events=True)
@@ -2945,6 +2965,13 @@ while True:             # Event Loop
         popup_language()
     elif event in shot['settings_user_change']:
         popup_uinput_single_string('username')
+    elif event in shot['settings_hospital_manage']:
+        try:
+            shot['conf_hosp']
+            shot['hospital']
+        except:
+            popup_select_hospital()
+        popup_show_hospital_info()            
     elif event in 'testing_stuff':
         popup_select_hospital()
     elif event in shot['stats_epicurve']:
