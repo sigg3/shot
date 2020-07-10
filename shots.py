@@ -381,8 +381,11 @@ def read_config_from(config_file):
         hospital[hospital_id][hosp_element][subsect].append(int(input_room_id)) # single room (not a range), add directly        
         unique_room_id = (str(hospital_id), str(subsect), str(input_room_id))
         unique_room_id = '_'.join(unique_room_id) # creates something like: 'MadeUp Hospital_Main building_115'
-        hospital[hospital_id][unique_room_id] = {}
-        hospital[hospital_id][unique_room_id]['status'] = None
+        try:
+            hospital[hospital_id][unique_room_id]
+        except:
+            hospital[hospital_id][unique_room_id] = {}
+            hospital[hospital_id][unique_room_id]['status'] = None
         hospital[hospital_id][unique_room_id][hosp_element] = subsect # this will add both deps and buildings to room_id dict
     
     
@@ -1097,8 +1100,8 @@ def popup_show_hospital_info(**kwargs):
         created_tstamp = datetime.datetime.now().isoformat()
         updated_tstamp = created_tstamp
         hospital_rooms = {} # ? TODO Check whether this is in use at all...
-
-
+        
+        
         do_go_on = True
         # Set author, creation date
         
@@ -1354,6 +1357,12 @@ def popup_show_hospital_info(**kwargs):
         # Otherwise we might end up overwriting good data/conf (this is why we have a cancel button)
         # So we need this loop to save to local vars, and then after, if the right button was clicked, we save to appropriate dict.
         
+        # TODO there are a lot of repeated calculations here.
+        # Consider just moving them to a local function, since we're now just working on hospital_info and not shot['hospital_info'].
+        
+        # NOTE
+        # If the user changes the configured hospital, window must be closed and re-opened.
+        
         # Actual GUI window logic here
         while True:
             # Status updates
@@ -1402,11 +1411,11 @@ def popup_show_hospital_info(**kwargs):
                         except:
                             print(f"{the_candidate} does not exist. Trying to add referral_dict[the_candidate] = ()")
                             try:
-                                referral_dict[the_candidate] = {}
-                                if id(referral_dict) == id(hospital_buildings) :
-                                    print(f"referral_dict = {id(referral_dict)} == buildings")
-                                else:
-                                    print(f"referral_dict = {id(referral_dict)} == departments")
+                                referral_dict[the_candidate] = [] # changed 2020-07-10. is a list, not a dict
+                              #  if id(referral_dict) == id(hospital_buildings) :
+                              #      print(f"referral_dict = {id(referral_dict)} == buildings")
+                              #  else:
+                              #      print(f"referral_dict = {id(referral_dict)} == departments")
                                 print(f"success: added {the_candidate} {the_candidate_is} to local subsect dict")
                             except:
                                 popup_some_error(f"Could not add '{the_candidate}' to shot['hospital'][{the_candidate_is}] for unknown reasons.") # TODO
@@ -1418,27 +1427,39 @@ def popup_show_hospital_info(**kwargs):
                 
                 # Fetch room info using popup
                 room_ids, room_dep, room_bld = popup_new_room(hospital_buildings, hospital_departments)
-                # list,  str, str, concat str, None
-                
                 
                 if room_ids:
-                    temp_output_dictionary = {}                    
-                    # Save to output dictionary
                     # Remember that we won't save output dictionary UNTIL USER HITS SAVE
-                    # So we need an exit function to change/add/create shot['hospital'] after loop
-                    # For now, we'll do a simple local dict.
-                    
-                    
                     # Using local hospital_info not shot['hospital']
+                    # These are generic lists:
+                    # hospital['MadeUp Hospital']['deps'][_department name_] = [ list of rooms in department ]
+                    # hospital['MadeUp Hospital']['blds'][_building name_] = [ list of rooms in building ]    
+                    # Then we have the custom (unique ones)
                     
-                    buildings_room_list
-                    
-                    for room_id in room_ids:
-                        room_id_unique = 
-                        temp_output_dictionary['
+                    # Setup building blocks first
+                    for hosp_sect in 'dep', 'bld':                        
+                        hosp_sect_item = room_dep if hosp_sect == 'dep' else room_bld
                         
+                        try:
+                            hospital_info[hosp_sect]
+                        except:
+                            hospital_info[hosp_sect] = {}
+                        
+                        try:
+                            hospital_info[hosp_sect][hosp_sect_item]
+                        except:
+                            hospital_info[hosp_sect][hosp_sect_item] = []
                     
-                    rooms_in_total = rooms_in_total + len(room_ids) # local var so won't matter 
+                    # Add rooms to appropriate containers
+                    for room_id in room_ids:
+                        hospital_info['dep'][room_dep].append(room_id)
+                        hospital_info['bld'][room_bld].append(room_id)
+                        unique_room_id = '_'.join(str(hospital_name), str(room_bld), str(room_id))
+                        hospital_info[unique_room_id] = {}
+                        hospital_info[unique_room_id]['status'] = None
+                        hospital_info[unique_room_id]['bld'] = room_bld
+                        hospital_info[unique_room_id]['dep'] = room_dep
+                    
                     sg.popup(f"{len(selected_rooms)} {shot['msg_hospital_room_added'].lower()}", title=shot['msg_hospital_rooms_add'], keep_on_top=True)
                 else:
                     popup_some_error(f"0 {shot['msg_hospital_room_added'].lower()}.\n{shot['msg_couldnotadd'].capitalize()} {shot['msg_hospital_rooms'].lower()}")
