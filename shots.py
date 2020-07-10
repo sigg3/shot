@@ -18,10 +18,8 @@
 
 import PySimpleGUI as sg
 import pandas as pd
-import time, csv, datetime
-import configparser
+import csv, datetime, copy, configparser
 from pathlib import Path
-#import copy
 
 
 # TO PONDER
@@ -1055,6 +1053,14 @@ def popup_show_hospital_info(**kwargs):
     # Parse args (or set defaults)
     create_new = kwargs.get('create_new', False) # this is a "create new hospital" scenario
     
+    # Set empty local dicts
+    # If user hits Save/Create hospital, then these are stored in shot['hospital']
+    # Otherwise, we want to destroy them (and create afresh upon new window)..
+    hospital_info = {}
+    hospital_departments = {}
+    hospital_buildings = {}
+    
+    
     if not create_new:
         # Show existing hospital using configured settings
         try:
@@ -1066,13 +1072,16 @@ def popup_show_hospital_info(**kwargs):
             button_doit = 'OK'
             button_other = shot['msg_change'] # switch to different hospital (if this is correct, then will msg_change suffice?)
             button_cancel = shot['msg_cancel']
-            created_tstamp = shot['hospital']['info']['created']
-            created_user = shot['hospital']['info']['created-by']
-            updated_tstamp = shot['hospital']['info']['updated']
-            updated_user = shot['hospital']['info']['updated-by']
-            original_version = shot['hospital']['info']['version']
-            hospital_departments = shot['hospital']['dep']
-            hospital_buildings = shot['hospital']['bld']
+            created_tstamp = shot['hospital']['info']['created']   # These should be copied, but are simple strings
+            created_user = shot['hospital']['info']['created-by']  #
+            updated_tstamp = shot['hospital']['info']['updated']   # But we want strings here NOT to change shot['hospital'] values (yet)
+            updated_user = shot['hospital']['info']['updated-by']  #
+            original_version = shot['hospital']['info']['version'] #
+            
+            # To allow state tracking (and undo/cancel) we use a deep copy here
+            hospital_info = copy.deepcopy(shot['hospital'])
+            hospital_departments = hospital_info['dep']
+            hospital_buildings = hospital_info['bld']
             do_go_on = True
         except:
             popup_some_error(shot['msg_hospital_no_hospitals'])
@@ -1088,9 +1097,8 @@ def popup_show_hospital_info(**kwargs):
         original_version = shot['version']
         created_tstamp = datetime.datetime.now().isoformat()
         updated_tstamp = created_tstamp
-        hospital_departments = {}
-        hospital_buildings = {}
         hospital_rooms = {} # ? TODO
+
 
         do_go_on = True
         # Set author, creation date
@@ -1342,6 +1350,12 @@ def popup_show_hospital_info(**kwargs):
         # Create the window object
         manage_hospital_win = sg.Window(hospital_info_title, layout=hospital_info_win, margins=(2, 2), resizable=False, return_keyboard_events=True, keep_on_top=False, finalize=True)
         
+        
+        # Note: all calculations done inside the loop must be on local vars
+        # Otherwise we might end up overwriting good data/conf (this is why we have a cancel button)
+        # So we need this loop to save to local vars, and then after, if the right button was clicked, we save to appropriate dict.
+        
+        # Actual GUI window logic here
         while True:
             # Status updates
 #            if subseq:
