@@ -1088,7 +1088,6 @@ def popup_show_hospital_info(**kwargs):
             do_go_on = False
     else:
         # Create new hospital scenario
-        
         hospital_name = kwargs.get('name')
         hospital_fullname = kwargs.get('fullname')
         hospital_info_title = f"{shot['msg_hospital_create']} - {hospital_name}"
@@ -1097,7 +1096,7 @@ def popup_show_hospital_info(**kwargs):
         original_version = shot['version']
         created_tstamp = datetime.datetime.now().isoformat()
         updated_tstamp = created_tstamp
-        hospital_rooms = {} # ? TODO
+        hospital_rooms = {} # ? TODO Check whether this is in use at all...
 
 
         do_go_on = True
@@ -1244,7 +1243,7 @@ def popup_show_hospital_info(**kwargs):
             number_of_rooms_in_departments = len(departments_room_list)
             
             # Global room count for 'hospital' (currently selected hospital)
-            list_of_rooms = [ x for x in shot['hospital'].items() if len(str(x)) > 4 ] # skips bld, dep and info, the rest are unique rooms
+            list_of_rooms = [ x for x in hospital_info.items() if len(str(x)) > 4 ]# skips bld, dep and info, the rest are unique rooms
             rooms_in_total = len(list_of_rooms)
             
             # Room coverage (index: [0] buildings, [1], departments), in % of total
@@ -1298,7 +1297,7 @@ def popup_show_hospital_info(**kwargs):
             est_contaminated_rooms_int = 0
             est_contaminated_rooms_per = '0.0%'
         else:
-            rooms_with_deviating_status = [ x[0] for x in shot['hospital'].items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+            rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
             est_contaminated_rooms_int = len(rooms_with_deviating_status)
             est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"
         
@@ -1430,6 +1429,8 @@ def popup_show_hospital_info(**kwargs):
                     # For now, we'll do a simple local dict.
                     
                     
+                    # Using local hospital_info not shot['hospital']
+                    
                     buildings_room_list
                     
                     for room_id in room_ids:
@@ -1467,7 +1468,7 @@ def popup_show_hospital_info(**kwargs):
                 list_of_rooms = list(set(departments_room_list + buildings_room_list)) # this is factually incorrect, but provides an estimate.
                 print(f"list_of_rooms = {list_of_rooms}")
             else:
-                list_of_rooms = [ x for x in shot['hospital'].items() if len(str(x)) > 4 ] # skips bld, dep and info, the rest are unique rooms
+                list_of_rooms = [ x for x in hospital_info.items() if len(str(x)) > 4 ] # skips bld, dep and info, the rest are unique rooms
             rooms_in_total = len(list_of_rooms)
             
             
@@ -1498,12 +1499,13 @@ def popup_show_hospital_info(**kwargs):
                 list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug}, {number_of_departments} {dep_conjug}, {rooms_in_total} {room_conjug}"
             
             # Do estimate of infected rooms
+            # TODO Subject for removal: This is data and not conf..
             if rooms_in_total == 0:
                 rooms_with_deviating_status = []
                 est_contaminated_rooms_int = 0
                 est_contaminated_rooms_per = '0.0%'
             else:
-                rooms_with_deviating_status = [ x[0] for x in shot['hospital'].items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
                 est_contaminated_rooms_int = len(rooms_with_deviating_status)
                 est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"            
                 
@@ -1516,8 +1518,8 @@ def popup_show_hospital_info(**kwargs):
         
         manage_hospital_win.close()
         
-    # TODO
-    # We have a problem: The window has an OK/Create hospital and a Cancel button
+    # Save local var 'hospital_info' to shot['hospital'] if so desired.
+    # The window has an OK/Create hospital and a Cancel button
     # That means we can only SAVE IFF user hits save or create. Otherwise data must be destroyed.
     # All calculations should be done one LOCAL VARS, so we can save it here (below) to appropriate dictionary (if desired)
     # Otherwise, hospitals might soon end up with a lot of cruft, making the application less usable..
