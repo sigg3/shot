@@ -216,7 +216,7 @@ def write_config_to(config_file):
                 # Pack room array into human-readable ranges before saving
                 config[subsect_str][array_identifier] = []
                 
-                # use int-list in case configparser or shot changes room number to str
+                # use int-list in case configparser or shot changes room number to str  #### TODO: This will break. update to allow alphanumeric! TODO ####
                 rooms_asint = [ int(room) for room in room_array ]
                 rooms_asint = list(set(rooms_asint)) # only unique values needed
                 rooms_asint.sort() # but they should be sorted (human-readabiity)
@@ -569,7 +569,7 @@ def room_list_from_arbitray_str(input_str):
     Takes an arbitrary "room list string" from e.g. popup_new_room() containing a string
     that feature a comma separated list of digits or ranges (including alphanumeric ranges).
     This is used in "unpacking" configuration files containing human-readable (and writeable) ranges,
-    for example: 1-3, A104-A199, A200-B200 (within certain conditions).
+    for example: 1-3, A104-A199, A200-B200 (within certain limitations).
     returns a list object 'formatted_list', so call using "my_saved_list, my_skipped_items = func(input_str)" format
     also returns a second list item 'skipped_items' for log or graphical warning that items were skipped
     check a returned object using e.g. len(my_saved_list) > 0
@@ -630,7 +630,7 @@ def room_list_from_arbitray_str(input_str):
                         accepted_ranges = [ x for x in range(65, 91) ] # A-Z (ends on 90)
                         accepted_ranges += [ x for x in range(97, 123) ] # a-z (ends on 122)
                         accepted_ranges += [ 198, 216, 197, 230, 248, 229 ] # Norwegian last letters
-                        # + add any of your own here, if applicable                        
+                        # + add any of your own language's special chars here, if applicable                        
                         
                         
                         for symbol_id in range(ord(split_beg[0]),ord(split_end[0])+1):
@@ -911,12 +911,8 @@ def popup_new_room(hospital_buildings, hospital_departments):
                     skipped_rooms_info = f"{shot['msg_couldnotadd']} {len(skipped_rooms)} {shot['msg_hospital_rooms']}:\n{', '.join(skipped_rooms)}"
                 popup_some_error(skipped_rooms_info)
             
-            if selected_rooms:
-                sg.popup(f"{len(selected_rooms)} {shot['msg_hospital_room_added']}", title=shot['msg_hospital_rooms_add'], keep_on_top=True) # TODO create information popup?
-                break
-            else:
-                popup_some_error(f"{shot['msg_hospital_room_noadded']}")        
-        
+            # exit loop (we don't want to re-set things if failure)
+            break
         
         # Set visuals
         if not create_new:
@@ -935,9 +931,9 @@ def popup_new_room(hospital_buildings, hospital_departments):
     
     # TODO append items to list and return as shown below ...
     
-    # returns information added in order: room_id, room_dep, room_bld, room_uniq, status
+    # returns information added in order: room_id, room_dep, room_bld
     
-    return ['lol', 'lol', 'lol', 'lol', 'lol']
+    return ['lol', 'lol', 'lol']
 
 
 
@@ -1068,7 +1064,7 @@ def popup_show_hospital_info(**kwargs):
             hospital_fullname = kwargs.get('fullname', shot['hospital']['info']['full'])
             hospital_info_title = f"Hospital info - {hospital_name}"
             button_doit = 'OK'
-            button_other = shot['msg_change'] # switch to different hospital
+            button_other = shot['msg_change'] # switch to different hospital (if this is correct, then will msg_change suffice?)
             button_cancel = shot['msg_cancel']
             created_tstamp = shot['hospital']['info']['created']
             created_user = shot['hospital']['info']['created-by']
@@ -1252,6 +1248,7 @@ def popup_show_hospital_info(**kwargs):
             # Room status indicator
             # Number of rooms that are infected (%)
             # read from: hospital[hospital_id][unique_room_id]['status'] = None
+            # Note: OBSOLETE because these are not room-config but room-data. Refer to data file (CSV) to do status
 
 
     # Pertinent strings
@@ -1363,8 +1360,8 @@ def popup_show_hospital_info(**kwargs):
             
             # Window read
             hosp_info_event, hosp_info_vals = manage_hospital_win.read()
-            print(f'hosp_info_event={hosp_info_event}')
-            print(f'hosp_info_vals={hosp_info_vals}')
+            print(f'hosp_info_event={hosp_info_event}') # debug
+            print(f'hosp_info_vals={hosp_info_vals}') # debug
             
             
             # Parse window events and execute
@@ -1407,12 +1404,30 @@ def popup_show_hospital_info(**kwargs):
             elif hosp_info_event == 'add_rooms_button':
                 
                 # Fetch room info using popup
-                room_id, room_dep, room_bld, room_uniq, status = popup_new_room(hospital_buildings, hospital_departments)
-                                
-                if create_new:
-                    pass # TODO
+                room_ids, room_dep, room_bld = popup_new_room(hospital_buildings, hospital_departments)
+                # list,  str, str, concat str, None
+                
+                
+                if room_ids:
+                    temp_output_dictionary = {}                    
+                    # Save to output dictionary
+                    # Remember that we won't save output dictionary UNTIL USER HITS SAVE
+                    # So we need an exit function to change/add/create shot['hospital'] after loop
+                    # For now, we'll do a simple local dict.
+                    
+                    
+                    
+                    
+                    for room_id in room_ids:
+                        room_id_unique = 
+                        temp_output_dictionary['
+                        
+                    
+                    rooms_in_total = rooms_in_total + len(room_ids) # local var so won't matter 
+                    sg.popup(f"{len(selected_rooms)} {shot['msg_hospital_room_added'].lower()}", title=shot['msg_hospital_rooms_add'], keep_on_top=True)
                 else:
-                    pass # TODO
+                    popup_some_error(f"0 {shot['msg_hospital_room_added'].lower()}.\n{shot['msg_couldnotadd'].capitalize()} {shot['msg_hospital_rooms'].lower()}")
+                
             elif hosp_info_event == shot['msg_hospital_create']:
                 if number_of_departments == 0 and number_of_buildings == 0:
                     popup_some_error(f"{shot['msg_hospital_no_buildings']}\n{shot['msg_hospital_no_departments']}\n{shot['msg_hospital_rooms_req']}")
@@ -1488,6 +1503,7 @@ def popup_show_hospital_info(**kwargs):
         manage_hospital_win.close()
         
     # TODO
+    # Save IF user hit save/create button. Otherwise data is destroyed.
 
 def add_hospital_section(sub_type, sub_name):
     """
@@ -2268,8 +2284,7 @@ def set_gui_strings(language):
     shot['msg_hospital_room_whatis'] = 'Rooms are the smallest units of the hospital.'
     shot['msg_hospital_room_indiv'] = 'Add individual rooms separated by comma.'
     shot['msg_hospital_room_range'] = 'Add a range of rooms by using a hyphen, e.g. 1-100.'
-    shot['msg_hospital_room_added'] = 'rooms were added.' # "N rooms were added."
-    shot['msg_hospital_room_noadded'] = 'No rooms were added.'
+    shot['msg_hospital_room_added'] = 'rooms added' # used in beginning and end of sentences following or preceding a number.
     shot['msg_hospital_room_status'] = 'Status'
     shot['msg_hospital_room_status_title'] = 'Optional room status'
     shot['msg_hospital_room_status_none'] = 'None'
