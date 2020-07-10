@@ -1416,7 +1416,7 @@ def popup_show_hospital_info(**kwargs):
                     # For now, we'll do a simple local dict.
                     
                     
-                    
+                    buildings_room_list
                     
                     for room_id in room_ids:
                         room_id_unique = 
@@ -1503,7 +1503,10 @@ def popup_show_hospital_info(**kwargs):
         manage_hospital_win.close()
         
     # TODO
-    # Save IF user hit save/create button. Otherwise data is destroyed.
+    # We have a problem: The window has an OK/Create hospital and a Cancel button
+    # That means we can only SAVE IFF user hits save or create. Otherwise data must be destroyed.
+    # All calculations should be done one LOCAL VARS, so we can save it here (below) to appropriate dictionary (if desired)
+    # Otherwise, hospitals might soon end up with a lot of cruft, making the application less usable..
 
 def add_hospital_section(sub_type, sub_name):
     """
