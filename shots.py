@@ -664,7 +664,7 @@ def room_list_from_arbitray_str(input_str):
                     # What we do here is reverse the string char by char until we don't get a digit. Everything after that is pretext (e.g. HS10B symbol).
                     
                     for str_to_chk in split_beg, split_end:
-                        room_is_digit = True
+                        room_is_int = True
                         my_numbers = ''
                         my_pretext = ''
                         for inchar in str_to_chk[::-1]:
@@ -860,6 +860,12 @@ def popup_new_room(hospital_buildings, hospital_departments):
     disable_radios = True
     loop_keys = ['radio_empty', 'radio_niu', 'radio_atrisk', 'radio_contam', 'radio_other', 'custom_status']
     
+    # Default return values
+    selected_rooms = []
+    skipped_rooms = []
+    sel_dep = None
+    sel_bld = None
+    
 
     while True:
         if not create_new:
@@ -905,9 +911,7 @@ def popup_new_room(hospital_buildings, hospital_departments):
    #         print(f"building: {sel_bld}")
    #         print(f"department: {sel_dep}")
 #
-     #       selected_rooms = [] # debug
-     #       skipped_rooms = [] # debug
- #           
+
             selected_rooms, skipped_rooms = room_list_from_arbitray_str(sel_rooms)
             
             print(f"selected_rooms = {selected_rooms}")
@@ -940,10 +944,8 @@ def popup_new_room(hospital_buildings, hospital_departments):
     
     create_new_room.close()
     
-    # TODO append items to list and return as shown below ...
-    
-    # returns information added in order: room_id, room_dep, room_bld
-    return selected_rooms, sel_dep, sel_bld 
+    # returns information added in order: room_id, skipped_room_ids, room_dep, room_bld
+    return selected_rooms, skipped_rooms, sel_dep, sel_bld 
 
 
 
@@ -1264,7 +1266,7 @@ def popup_show_hospital_info(**kwargs):
             if rooms_in_total < 1 :
                 room_coverage = room_coverage = [ '0.0%', '0.0%' ]
             else:
-                room_coverage = [ f"{(x/rooms_in_total)*100:0.1f}%" for x in [ rooms_in_buildings, rooms_in_departments] ]
+                room_coverage = [ f"{(x/rooms_in_total)*100:0.1f}%" for x in [ number_of_rooms_in_buildings, number_of_rooms_in_departments] ]
             
             # Room status indicator
             # Number of rooms that are infected (%)
@@ -1438,7 +1440,7 @@ def popup_show_hospital_info(**kwargs):
             elif hosp_info_event == 'add_rooms_button':
                 
                 # Fetch room info using popup
-                room_ids, room_dep, room_bld = popup_new_room(hospital_buildings, hospital_departments)
+                room_ids, skipped_rooms, room_dep, room_bld = popup_new_room(hospital_buildings, hospital_departments)
                 
                 if room_ids:
                     # Remember that we won't save output dictionary UNTIL USER HITS SAVE
@@ -1466,15 +1468,17 @@ def popup_show_hospital_info(**kwargs):
                     for room_id in room_ids:
                         hospital_departments[room_dep].append(room_id) # hospital_departments = hospital_info['dep']
                         hospital_buildings[room_bld].append(room_id)   # hospital_buildings   = hospital_info['bld']
-                        unique_room_id = '_'.join(str(hospital_name), str(room_bld), str(room_id))
+                        unique_room_id = (str(hospital_name), str(room_bld), str(room_id))
+                        unique_room_id = '_'.join(unique_room_id)
                         hospital_info[unique_room_id] = {}
                         hospital_info[unique_room_id]['status'] = None
                         hospital_info[unique_room_id]['bld'] = room_bld
                         hospital_info[unique_room_id]['dep'] = room_dep
                     
-                    sg.popup(f"{len(selected_rooms)} {shot['msg_hospital_room_added'].lower()}", title=shot['msg_hospital_rooms_add'], keep_on_top=True)
+                    sg.popup(f"{len(room_ids)} {shot['msg_hospital_room_added'].lower()}", title=shot['msg_hospital_rooms_add'], keep_on_top=True)
                 else:
-                    popup_some_error(f"0 {shot['msg_hospital_room_added'].lower()}.\n{shot['msg_couldnotadd'].capitalize()} {shot['msg_hospital_rooms'].lower()}")
+                    popup_some_error(f"0 {shot['msg_hospital_room_added'].lower()}.\n{shot['msg_couldnotadd'].capitalize()} {len(skipped_rooms)} {shot['msg_hospital_rooms'].lower()}")
+                    print(f"Error: skipped rooms = {skipped_rooms}\nCould not add these :(")
                 
             elif hosp_info_event == button_doit:
                 if number_of_departments == 0 and number_of_buildings == 0:
@@ -1512,7 +1516,7 @@ def popup_show_hospital_info(**kwargs):
             if rooms_in_total == 0:
                 room_coverage = room_coverage = [ '0.0%', '0.0%' ]
             else:
-                room_coverage = [ f"{(x/rooms_in_total)*100:0.1f}%" for x in [ rooms_in_buildings, rooms_in_departments] ]
+                room_coverage = [ f"{(x/rooms_in_total)*100:0.1f}%" for x in [ number_of_rooms_in_buildings, number_of_rooms_in_departments] ]
             
             # Set view and add_rooms button "visibility" (deactivated or activated)
             view_room_disabled = False if (number_of_rooms_in_departments > 0) or (number_of_rooms_in_buildings > 0) else True
@@ -1542,6 +1546,10 @@ def popup_show_hospital_info(**kwargs):
                 est_contaminated_rooms_per = '0.0%'
             else:
                 rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                # ERROR HERE: 
+                #    rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                #    KeyError: 'status'
+
                 est_contaminated_rooms_int = len(rooms_with_deviating_status)
                 est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"            
                 
@@ -1560,6 +1568,8 @@ def popup_show_hospital_info(**kwargs):
             # That means we can only SAVE IFF user hits save or create. Otherwise data must be destroyed.
             # All calculations should be done one LOCAL VARS, so we can save it here (below) to appropriate dictionary (if desired)
             # Otherwise, hospitals might soon end up with a lot of cruft, making the application less usable..
+            
+            print('TODO: There is stuff that needs to be saved.')
             
             pass # TODO
         
