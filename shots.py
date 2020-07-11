@@ -1145,7 +1145,36 @@ def popup_show_hospital_info(**kwargs):
             button_line = [sg.Button(button_doit), sg.Button(button_cancel)]
         else:
             button_line = [sg.Button(button_doit), sg.Button(button_other), sg.Button(button_cancel)]
-       
+        
+        
+        # Local functions
+        def quick_estimate_infected_rooms():
+            if outbreak_filename is None:
+                rooms_with_deviating_status = []
+                est_contaminated_rooms_int = 'N/A'
+                est_contaminated_rooms_per = 'no data'
+            else:
+                if rooms_in_total == 0:
+                    rooms_with_deviating_status = []
+                    est_contaminated_rooms_int = 0
+                    est_contaminated_rooms_per = '0.0%'
+                else:
+                    rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                    est_contaminated_rooms_int = len(rooms_with_deviating_status)
+                    est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"
+            return rooms_with_deviating_status, est_contaminated_rooms_int, est_contaminated_rooms_per
+        
+        def get_list_rooms_line_str():
+            if rooms_in_total == 0:
+                list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
+            elif number_of_departments == 0 or number_of_buildings == 0:
+                list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
+            else:
+                bld_conjug = shot['msg_hospital_building'] if number_of_buildings == 1 else shot['msg_hospital_buildings']
+                dep_conjug = shot['msg_hospital_department'] if number_of_departments == 1 else shot['msg_hospital_departments']
+                room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
+                list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug.lower()}, {number_of_departments} {dep_conjug.lower()}, {rooms_in_total} {room_conjug.lower()}"
+            return list_rooms_line
        
        
         # Data for tables are e.g.
@@ -1291,15 +1320,17 @@ def popup_show_hospital_info(**kwargs):
     # shot['msg_hospital_building_add'] = 'Add building'       
        
         
-        if rooms_in_total == 0:
-            list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
-        elif number_of_departments == 0 or number_of_buildings == 0:
-            list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
-        else:
-            bld_conjug = shot['msg_hospital_building'] if number_of_buildings == 1 else shot['msg_hospital_buildings']
-            dep_conjug = shot['msg_hospital_department'] if number_of_departments == 1 else shot['msg_hospital_departments']
-            room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
-            list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug.lower()}, {number_of_departments} {dep_conjug.lower()}, {rooms_in_total} {room_conjug.lower()}"
+        list_rooms_line = get_list_rooms_line_str()
+        
+#        if rooms_in_total == 0:
+#            list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
+#        elif number_of_departments == 0 or number_of_buildings == 0:
+#            list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
+#        else:
+#            bld_conjug = shot['msg_hospital_building'] if number_of_buildings == 1 else shot['msg_hospital_buildings']
+#            dep_conjug = shot['msg_hospital_department'] if number_of_departments == 1 else shot['msg_hospital_departments']
+#            room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
+#            list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug.lower()}, {number_of_departments} {dep_conjug.lower()}, {rooms_in_total} {room_conjug.lower()}"
         
            
         # Disable/enable View Buildings button
@@ -1310,19 +1341,20 @@ def popup_show_hospital_info(**kwargs):
         
         
         # Do estimate of infected rooms
-        if outbreak_filename is None:
-            rooms_with_deviating_status = []
-            est_contaminated_rooms_int = 'N/A'
-            est_contaminated_rooms_per = 'no data'
-        else:
-            if rooms_in_total == 0:
-                rooms_with_deviating_status = []
-                est_contaminated_rooms_int = 0
-                est_contaminated_rooms_per = '0.0%'
-            else:
-                rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
-                est_contaminated_rooms_int = len(rooms_with_deviating_status)
-                est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"
+        rooms_with_deviating_status, est_contaminated_rooms_int, est_contaminated_rooms_per = quick_estimate_infected_rooms()
+        # if outbreak_filename is None:
+            # rooms_with_deviating_status = []
+            # est_contaminated_rooms_int = 'N/A'
+            # est_contaminated_rooms_per = 'no data'
+        # else:
+            # if rooms_in_total == 0:
+                # rooms_with_deviating_status = []
+                # est_contaminated_rooms_int = 0
+                # est_contaminated_rooms_per = '0.0%'
+            # else:
+                # rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                # est_contaminated_rooms_int = len(rooms_with_deviating_status)
+                # est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"
         
         
         # Buildings
@@ -1514,7 +1546,7 @@ def popup_show_hospital_info(**kwargs):
             # Global room count for 'hospital' (currently selected hospital)
             if create_new:
                 list_of_rooms = list(set(departments_room_list + buildings_room_list)) # this is factually incorrect, but provides an estimate.
-                print(f"list_of_rooms = {list_of_rooms}")
+                #print(f"list_of_rooms = {list_of_rooms}")
             else:
                 list_of_rooms = [ x for x in hospital_info.items() if len(str(x)) > 4 ] # skips bld, dep and info, the rest are unique rooms
             rooms_in_total = len(list_of_rooms)
@@ -1536,36 +1568,38 @@ def popup_show_hospital_info(**kwargs):
 
             # Set helpful tip at the top (removed if all is well)
             # TODO test if this should be in bold or different color.
-            if number_of_departments == 0 or number_of_buildings == 0:
-                list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
-            elif rooms_in_total == 0:
-                list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
-            else:
-                bld_conjug = shot['msg_hospital_building'] if number_of_buildings == 1 else shot['msg_hospital_buildings']
-                dep_conjug = shot['msg_hospital_department'] if number_of_departments == 1 else shot['msg_hospital_departments']
-                room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
-                list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug.lower()}, {number_of_departments} {dep_conjug.lower()}, {rooms_in_total} {room_conjug.lower()}"
+            list_rooms_line = get_list_rooms_line_str()
+            # if number_of_departments == 0 or number_of_buildings == 0:
+                # list_rooms_line = f"{shot['msg_hospital_no_rooms']} {shot['msg_hospital_rooms_req']}"
+            # elif rooms_in_total == 0:
+                # list_rooms_line = f"{shot['msg_hospital_no_rooms']}"
+            # else:
+                # bld_conjug = shot['msg_hospital_building'] if number_of_buildings == 1 else shot['msg_hospital_buildings']
+                # dep_conjug = shot['msg_hospital_department'] if number_of_departments == 1 else shot['msg_hospital_departments']
+                # room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
+                # list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug.lower()}, {number_of_departments} {dep_conjug.lower()}, {rooms_in_total} {room_conjug.lower()}"
                 # print(f"list_rooms_line='{list_rooms_line}'")
             
             
             # Do estimate of infected rooms
             # TODO Subject for removal: This is data and not conf..
-            if outbreak_filename is None:
-                rooms_with_deviating_status = []
-                est_contaminated_rooms_int = 'N/A'
-                est_contaminated_rooms_per = 'no data'
-            else:
-                if rooms_in_total == 0:
-                    rooms_with_deviating_status = []
-                    est_contaminated_rooms_int = 0
-                    est_contaminated_rooms_per = '0.0%'
-                else: 
-                    rooms_with_deviating_status = [ k for k,v in hospital_info.items() if len(str(k)) > 4 and v['status'] != None ]
-                    #rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
-                    # Got KeyError: 'status' with the original
+            rooms_with_deviating_status, est_contaminated_rooms_int, est_contaminated_rooms_per = quick_estimate_infected_rooms()
+            # if outbreak_filename is None:
+                # rooms_with_deviating_status = []
+                # est_contaminated_rooms_int = 'N/A'
+                # est_contaminated_rooms_per = 'no data'
+            # else:
+                # if rooms_in_total == 0:
+                    # rooms_with_deviating_status = []
+                    # est_contaminated_rooms_int = 0
+                    # est_contaminated_rooms_per = '0.0%'
+                # else: 
+                    # rooms_with_deviating_status = [ k for k,v in hospital_info.items() if len(str(k)) > 4 and v['status'] != None ]
+                    # #rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                    # # Got KeyError: 'status' with the original
 
-                    est_contaminated_rooms_int = len(rooms_with_deviating_status)
-                    est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"            
+                    # est_contaminated_rooms_int = len(rooms_with_deviating_status)
+                    # est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"            
                 
             # Update GUI stringsand fields
             manage_hospital_win.Finalize
