@@ -1557,9 +1557,9 @@ def popup_show_hospital_info(**kwargs):
             
             # Update calculations
             room_coverage = quick_room_coverage(rooms_in_total)
-            print(f"room_buildings:   {number_of_rooms_in_buildings}")
-            print(f"room_departments: {number_of_rooms_in_departments}")
-            print(f"room_coverage: {room_coverage}") # debug
+            #print(f"room_buildings:   {number_of_rooms_in_buildings}")
+            #print(f"room_departments: {number_of_rooms_in_departments}")
+            #print(f"room_coverage: {room_coverage}") # debug
             
             # Set view and add_rooms button "visibility" (deactivated or activated)
             view_room_disabled = False if (number_of_rooms_in_departments > 0) or (number_of_rooms_in_buildings > 0) else True
@@ -1596,6 +1596,8 @@ def popup_show_hospital_info(**kwargs):
             # That means we can only SAVE IFF user hits save or create. Otherwise data must be destroyed.
             # All calculations should be done one LOCAL VARS, so we can save it here (below) to appropriate dictionary (if desired)
             # Otherwise, hospitals might soon end up with a lot of cruft, making the application less usable..
+            
+            # TODO This is priority now
             
             print('TODO: There is stuff that needs to be saved.')
             
