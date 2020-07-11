@@ -1516,7 +1516,7 @@ def popup_show_hospital_info(**kwargs):
                         hospital_info[unique_room_id]['dep'] = room_dep
                     
                     sg.popup(f"{len(room_ids)} {shot['msg_hospital_room_added'].lower()}", title=shot['msg_hospital_rooms_add'], keep_on_top=True)
-                else:
+                elif len(skipped_rooms) > 0:
                     popup_some_error(f"0 {shot['msg_hospital_room_added'].lower()}.\n{shot['msg_couldnotadd'].capitalize()} {len(skipped_rooms)} {shot['msg_hospital_rooms'].lower()}")
                     print(f"Error: skipped rooms = {skipped_rooms}\nCould not add these :(")
                 
@@ -1619,7 +1619,6 @@ def popup_show_hospital_info(**kwargs):
             
             print('TODO: There is stuff that needs to be saved.')
             
-            pass # TODO
         
         
 
