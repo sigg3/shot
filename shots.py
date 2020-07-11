@@ -1544,8 +1544,10 @@ def popup_show_hospital_info(**kwargs):
                 rooms_with_deviating_status = []
                 est_contaminated_rooms_int = 0
                 est_contaminated_rooms_per = '0.0%'
-            else:
-                rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+            else: 
+                rooms_with_deviating_status = [ k for k,v in hospital_info.items() if len(str(k)) > 4 and v['status'] != None ]
+                #rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                
                 # ERROR HERE: 
                 #    rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
                 #    KeyError: 'status'
