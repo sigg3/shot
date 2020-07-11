@@ -1310,14 +1310,19 @@ def popup_show_hospital_info(**kwargs):
         
         
         # Do estimate of infected rooms
-        if rooms_in_total == 0:
+        if outbreak_filename is None:
             rooms_with_deviating_status = []
-            est_contaminated_rooms_int = 0
-            est_contaminated_rooms_per = '0.0%'
+            est_contaminated_rooms_int = 'N/A'
+            est_contaminated_rooms_per = 'no data'
         else:
-            rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
-            est_contaminated_rooms_int = len(rooms_with_deviating_status)
-            est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"
+            if rooms_in_total == 0:
+                rooms_with_deviating_status = []
+                est_contaminated_rooms_int = 0
+                est_contaminated_rooms_per = '0.0%'
+            else:
+                rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                est_contaminated_rooms_int = len(rooms_with_deviating_status)
+                est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"
         
         
         # Buildings
@@ -1541,19 +1546,26 @@ def popup_show_hospital_info(**kwargs):
                 room_conjug = shot['msg_hospital_room'] if rooms_in_total == 1 else shot['msg_hospital_rooms']
                 list_rooms_line = f"{hospital_name}: {number_of_buildings} {bld_conjug.lower()}, {number_of_departments} {dep_conjug.lower()}, {rooms_in_total} {room_conjug.lower()}"
                 # print(f"list_rooms_line='{list_rooms_line}'")
+            
+            
             # Do estimate of infected rooms
             # TODO Subject for removal: This is data and not conf..
-            if rooms_in_total == 0:
+            if outbreak_filename is None:
                 rooms_with_deviating_status = []
-                est_contaminated_rooms_int = 0
-                est_contaminated_rooms_per = '0.0%'
-            else: 
-                rooms_with_deviating_status = [ k for k,v in hospital_info.items() if len(str(k)) > 4 and v['status'] != None ]
-                #rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
-                # Got KeyError: 'status' with the original
+                est_contaminated_rooms_int = 'N/A'
+                est_contaminated_rooms_per = 'no data'
+            else:
+                if rooms_in_total == 0:
+                    rooms_with_deviating_status = []
+                    est_contaminated_rooms_int = 0
+                    est_contaminated_rooms_per = '0.0%'
+                else: 
+                    rooms_with_deviating_status = [ k for k,v in hospital_info.items() if len(str(k)) > 4 and v['status'] != None ]
+                    #rooms_with_deviating_status = [ x[0] for x in hospital_info.items() if len(str(x)) > 4 and x[1]['status'] != None ] # grab unique rooms with status != None
+                    # Got KeyError: 'status' with the original
 
-                est_contaminated_rooms_int = len(rooms_with_deviating_status)
-                est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"            
+                    est_contaminated_rooms_int = len(rooms_with_deviating_status)
+                    est_contaminated_rooms_per = f"{(est_contaminated_rooms_int/rooms_in_total)*100:0.1f}%"            
                 
             # Update GUI stringsand fields
             manage_hospital_win.Finalize
