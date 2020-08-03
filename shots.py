@@ -404,7 +404,7 @@ def read_config_from(config_file):
                 # This will be stored in e.g. shot['hospital']['info']['created-by'] (for the currently active hospital)
                 hospital[hospital_id]['info'] = {
                                                 'name': config[hospital_id]['name'],
-                                                'full': config[hospital_id]['fullname'],
+                                                'legal': config[hospital_id]['legal'],
                                                 'created': config[hospital_id]['created'],
                                                 'created-by': config[hospital_id]['created-by'],
                                                 'updated': config[hospital_id]['updated'],
@@ -1085,7 +1085,7 @@ def popup_show_hospital_info(**kwargs):
             shot['conf_hosp']
             shot['hospital']
             hospital_name = kwargs.get('name', shot['conf_hosp'])
-            hospital_fullname = kwargs.get('fullname', shot['hospital']['info']['full'])
+            hospital_fullname = kwargs.get('fullname', shot['hospital']['info']['legal'])
             hospital_info_title = f"Hospital info - {hospital_name}"
             button_doit = 'OK'
             button_other = shot['msg_change'] # switch to different hospital (if this is correct, then will msg_change suffice?)
@@ -1112,8 +1112,8 @@ def popup_show_hospital_info(**kwargs):
         button_doit = shot['msg_hospital_create']
         button_cancel = shot['msg_cancel']
         original_version = shot['version']
-        created_tstamp = datetime.datetime.now().isoformat()
-        updated_tstamp = created_tstamp
+        updated_tstamp = datetime.datetime.now().isoformat()
+        created_tstamp = updated_tstamp
         hospital_rooms = {} # ? TODO Check whether this is in use at all...
         
         
@@ -1613,9 +1613,23 @@ def popup_show_hospital_info(**kwargs):
                     shot['hospital'] # might not exist yet.. 
                 except:
                     shot['hospital'] = {} # just to be safe ..
+            else:
+                updated_tstamp = datetime.datetime.now().isoformat()
             
-            # Write to dict using copy
+            # Save hospital information to dict using copy
             shot['hospital'] = copy.deepcopy(hospital_info)
+            
+            # Save meta data too
+            # These are setup/fetched at the top of the function, and should be safe
+            shot['hospital']['info']['name'] = hospital_name
+            shot['hospital']['info']['legal'] = hospital_fullname
+            shot['hospital']['info']['created'] = created_tstamp
+            shot['hospital']['info']['updated'] = updated_tstamp
+            shot['hospital']['info']['created-by'] = created_user
+            shot['hospital']['info']['updated-by'] = updated_user
+            shot['hospital']['info']['version'] = original_version
+            
+            # Debug messages
             print("Saved data to shot['hospital']") # debug
             print(shot['hospital']) # debug
         
@@ -1761,7 +1775,7 @@ def popup_uinput_single_string(popup_query_type):
         # typically ran from popup_show_hospital_info()
         try:
             shot['hospital']['info']['name'] # conf_hosp can be None, so try with this longer
-            uinput_popup_title = f"{shot['conf_hosp']} - {shot['msg_hospital_building_add']}"
+            uinput_popup_title = f"{shot['conf_hosp']} - {shot['msg_hospital_building_add']}" # ??? TODO why use conf_hosp here if we tested shot[] value ?
         except:
             uinput_popup_title = shot['msg_hospital_building_add']
         uinput_popup_purpose = shot['msg_hospital_building_purpose']
