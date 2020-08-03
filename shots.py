@@ -599,7 +599,7 @@ def room_list_from_arbitray_str(input_str):
                 if split_beg.isdigit() and split_end.isdigit():
                     # numeric range (recommended practice)
                     formatted_list += [ str(room_id) for room_id in range(int(split_beg), int(split_end)+1) ]
-                elif (split_beg[0].isalpha() and split_end[0].isalpha()) and (split_beg[1:].isdigit() and split_beg[1:].isdigit()):
+                elif (split_beg[0].isalpha() and split_end[0].isalpha()) and (split_beg[1:].isdigit() and split_end[1:].isdigit()):
                     # simple alpha(numeric) range
                     #
                     # If the start is alpha and "the rest" is a digit, we can work with it alphabetically, assuming beginning alpha is prior to ending alpha
@@ -614,7 +614,7 @@ def room_list_from_arbitray_str(input_str):
                     # This is the limit of what we can be expected to support based on arbitrary user input.
                     
                     concat_begend = split_beg[0] + split_beg[1]
-                    if list(concat_begend) == sorted(concat_begend): # check whether we're alphabetical (e.g. does the first letter (A) come before the second letter (B) ?)
+                    if list(concat_begend) == sorted(concat_begend) or (concat_begend == (split_end[0]+split_end[1])): # check whether we're alphabetical (e.g. does the first letter (A) come before the second letter (B) ?)
                         # Get length to establish padding/preceding zeroes (if any)
                         # e.g. if len is 3 and value is 20, we print 020, else just 20.
                         output_len = len(split_beg[1:])
@@ -1530,7 +1530,9 @@ def popup_show_hospital_info(**kwargs):
                     popup_some_error(f"{shot['msg_hospital_overview']} {shot['msg_hospital_no_rooms']}")
                 else:
                     if hosp_info_event == shot['msg_hospital_create']:
-                        print('hospital create scenario TODO') # TODO
+                        do_create_hospital = True
+                    else:
+                        do_create_hospital = False
                     do_go_on = True # Save to "real" dict
                     break
             
@@ -1591,16 +1593,31 @@ def popup_show_hospital_info(**kwargs):
         manage_hospital_win.close()
         
         if do_go_on:
+            # TODO rename "do_go_on" from ambiguous name
             # Save local var 'hospital_info' to shot['hospital'] if so desired.
             # The window has an OK/Create hospital and a Cancel button
             # That means we can only SAVE IFF user hits save or create. Otherwise data must be destroyed.
             # All calculations should be done one LOCAL VARS, so we can save it here (below) to appropriate dictionary (if desired)
             # Otherwise, hospitals might soon end up with a lot of cruft, making the application less usable..
+            # do_go_on is true IFF we want to save/create
             
-            # TODO This is priority now
+            # Remember that we won't save output dictionary UNTIL USER HITS SAVE
+            # Using local hospital_info not shot['hospital']
+            # These are generic lists:
+            # hospital['MadeUp Hospital']['deps'][_department name_] = [ list of rooms in department ]
+            # hospital['MadeUp Hospital']['blds'][_building name_] = [ list of rooms in building ]    
+            # Then we have the custom (unique ones)
             
-            print('TODO: There is stuff that needs to be saved.')
+            if do_create_hospital:
+                try:
+                    shot['hospital'] # might not exist yet.. 
+                except:
+                    shot['hospital'] = {} # just to be safe ..
             
+            # Write to dict using copy
+            shot['hospital'] = copy.deepcopy(hospital_info)
+            print("Saved data to shot['hospital']") # debug
+            print(shot['hospital']) # debug
         
         
 
