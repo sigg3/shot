@@ -1069,6 +1069,9 @@ def popup_show_hospital_info(**kwargs):
     # Parse args (or set defaults)
     create_new = kwargs.get('create_new', False) # this is a "create new hospital" scenario
     
+    # Simple bool to prompt user to save if changes were made..
+    changes_were_made = False
+    
     # Set empty local dicts
     # If user hits Save/Create hospital, then these are stored in shot['hospital']
     # Otherwise, we want to destroy them (and create afresh upon new window)..
@@ -1320,21 +1323,21 @@ def popup_show_hospital_info(**kwargs):
             # Note: OBSOLETE because these are not room-config but room-data. Refer to data file (CSV) to do status
 
 
-    # Pertinent strings
+        # Pertinent strings
 
-    # shot['msg_hospital_department'] = 'Department' # unit ..?
-    # shot['msg_hospital_departments'] = 'Departments'
-    # shot['msg_hospital_building'] = 'Building'
-    # shot['msg_hospital_buildings'] = 'Buildings'
-    # shot['msg_hospital_room'] = 'Room'
-    # shot['msg_hospital_rooms'] = 'Rooms'
-    # shot['msg_hospital_overview'] = 'A hospital contains buildings, departments and rooms.'    
-    # shot['msg_hospital_rooms_add'] = 'Add rooms'
-    # shot['msg_hospital_rooms_req'] = 'Rooms require at least one building and one department.'
-    # shot['msg_hospital_department_add'] = 'Add department'
-    # shot['msg_hospital_building_add'] = 'Add building'       
-       
-        
+        # shot['msg_hospital_department'] = 'Department' # unit ..?
+        # shot['msg_hospital_departments'] = 'Departments'
+        # shot['msg_hospital_building'] = 'Building'
+        # shot['msg_hospital_buildings'] = 'Buildings'
+        # shot['msg_hospital_room'] = 'Room'
+        # shot['msg_hospital_rooms'] = 'Rooms'
+        # shot['msg_hospital_overview'] = 'A hospital contains buildings, departments and rooms.'    
+        # shot['msg_hospital_rooms_add'] = 'Add rooms'
+        # shot['msg_hospital_rooms_req'] = 'Rooms require at least one building and one department.'
+        # shot['msg_hospital_department_add'] = 'Add department'
+        # shot['msg_hospital_building_add'] = 'Add building'       
+           
+            
         list_rooms_line = get_list_rooms_line_str()
 
         # Disable/enable View Buildings button
@@ -1462,6 +1465,7 @@ def popup_show_hospital_info(**kwargs):
                               #  else:
                               #      print(f"referral_dict = {id(referral_dict)} == departments")
                                 print(f"success: added {the_candidate} {the_candidate_is} to local subsect dict")
+                                changes_were_made = True
                             except:
                                 popup_some_error(f"Could not add '{the_candidate}' to shot['hospital'][{the_candidate_is}] for unknown reasons.") # TODO
                     else:
@@ -1484,7 +1488,7 @@ def popup_show_hospital_info(**kwargs):
                     # print('debugging')
                     # print(f"room_dep = '{room_dep}', type is {type(room_dep)}")
                     # print(f"room_bld = '{room_bld}', type is {type(room_bld)}")
-
+                    changes_were_made = True
                     
                     # Setup building blocks first
                     for hosp_sect in 'dep', 'bld':
@@ -1591,6 +1595,13 @@ def popup_show_hospital_info(**kwargs):
             
             
         manage_hospital_win.close()
+        
+        if changes_were_made and not do_go_on:
+            # We'll only prompt when there's an existing config to avoid having to re-check for missing data here
+            if not create_new:
+                do_go_on = sg.popup(f"{shot['msg_unsaved_changes']} {hospital_name}.\n{shot['msg_savechanges']}?", title=f"{shot['msg_savechanges']}?", custom_text=(shot['file_save'],shot['msg_cancel']))
+                do_go_on = True if do_go_on == True else False
+            
         
         if do_go_on:
             # TODO rename "do_go_on" from ambiguous name
@@ -2346,6 +2357,7 @@ def set_gui_strings(language):
     # General application strings
     shot['msg_change'] = 'Change'
     shot['msg_cancel'] = 'Cancel'
+    shot['msg_savechanges'] = 'Save changes' # might be used as a question "{shot['msg_savechanges']}?"
     shot['msg_missing'] = 'Missing' # For errors, e.g. Missing: <some input>
     shot['msg_show'] = 'Show'
     shot['msg_version'] = 'Version'
@@ -2378,6 +2390,7 @@ def set_gui_strings(language):
     shot['err_no_headers'] = 'Incorrect file type. File did not contain any headers..'
     shot['err_weird_data_string'] = 'Weird. Cannot convert input file string to Path object.'
     shot['err_input_notafile'] = 'Incorrect input. Input is not a file.'
+    shot['msg_unsaved_changes'] = 'There are unsaved changes in ' # completed by <file> or <hospital name> etc.
     
     # Hospital admin strings
     shot['msg_hospital_no_hospitals'] = 'There are no hospitals configured.'
