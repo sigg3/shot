@@ -146,29 +146,33 @@ def write_config_to(config_file):
     
     config = configparser.ConfigParser()
     
-    # Set the defaults
-    config['OPTIONS'] = {
-                        'user': shot['conf_user'],
-                        'language': shot['conf_lang'],
-                        'unique': shot['conf_uniq'],
-                        'hospital': shot['conf_hosp'] # This is hospital set as string
-                        }
+    # Lookup/Defaults
+    config_user = shot.get('conf_user', None)
+    config_language = shot.get('conf_lang', 'English')
+    config_unique = shot.get('conf_uniq', 'FNR')
+    config_hospital = shot.get('conf_hosp', None)
     
+    # Set the defaults (will raise type error if any are None or not string)
+    config['OPTIONS'] = {
+                        'user': config_user,
+                        'language': config_language,
+                        'unique': config_unique,
+                        'hospital': config_hospital # This is hospital set as string
+                        }
     
     # Please beware, we have 3 levels
     # hospital dict = contains all the hospital(s) currently known to SHOT (either read from outbreak CSV files and/or settings.ini)
     # shot['conf_hosp'] = the name of hospital configured, as string
     # shot['hospital'] = the current hospital configured, dictionary of dictionaries
-    
-    
+
     # See if we have any recent files stored on dict
     config['RECENT'] = {}
-    recent_counter = 0
-    for recent_file in shot['conf_recent']:
-        recent_counter += 1
-        config['RECENT'][str(recent_counter)] = recent_file
-        if recent_counter == shot['show_recent_files']: break # max
-    
+    if shot['conf_recent'] is not None:
+        recent_counter = 0
+        for recent_file in shot['conf_recent']:
+            recent_counter += 1
+            config['RECENT'][str(recent_counter)] = recent_file
+            if recent_counter == shot['show_recent_files']: break # max
     
     
     # See if we have any hospital(s) to store:
@@ -183,19 +187,29 @@ def write_config_to(config_file):
             config[hospital_id][infovar] = infoval
         
         
+        # TODO FIX THIS CONFUSION
+        # We have moved away from some of these denominations.
+        # We can safely use [first_part_of_hospital_name]+bld and +dep
+        
+        
+        
         # Hospital subsections (buildings, departments):
-        for subsect in 'Blds', 'Deps':
-            if 'Blds' in subsect:
+        for subsect in 'bld', 'dep':
+            if 'bld' in subsect:
                 subsect_str = 'buildings'
             else:
                 subsect_str = 'departments'
             
-            # Standard subsec names
-            check_str = hospital[hospital_id]['name'].split()[0] + subsect
-            alt_check = check_str + str(len(hospital[hospital_id]['name']))
+            # Standard default subsec names
+            check_str = hospital[hospital_id]['info']['name'].split()[0] + subsect.capitalize()
+            alt_check = check_str + str(len(hospital[hospital_id]['info']['name']))
             
-            # Configured subsec name 
-            subsect_name = hospital[hospital_id][subsect_str]
+            # Configured actual subsec name
+            if subsect in hospital[hospital_id].keys():
+                subsect_name = subsect
+            else:
+                print(f"Error: cannot find appropriate key {subsect} for hospital[{hospital_id}] type {subsect_str}")
+                continue
 
             # Non-standard name might be on purpose (to avoid dupliate)
             # Note: we should not do any error correction here, it makes more sense to do duplicate avoidance in Create New Hospital scenarios..
@@ -207,6 +221,12 @@ def write_config_to(config_file):
             
             # Create section (dict) in config file
             config[subsect_str] = {}
+            
+            
+            # DEBUG
+            print('skipping rooms DEBUG') # requires rewrite of below snippets
+            continue
+
             
             # Populate section with room var name (array identifier) and corresponding rooms (values)
             for array_identifier, room_array in hospital[hospital_id][subsect.lower()].items():
@@ -906,7 +926,7 @@ def popup_new_room(hospital_buildings, hospital_departments):
             break
         elif croom_event == shot['msg_cancel']:
             break
-        elif croom_event == 'add_room_exec':
+        elif croom_event == 'add_room_exec' or croom_event == 'Return:36':
             # Only required field is room number
             sel_bld = croom_value[0]
             sel_dep = croom_value[1]
@@ -1604,7 +1624,6 @@ def popup_show_hospital_info(**kwargs):
             
         
         if do_go_on:
-            print('debug: saving data')
             # TODO rename "do_go_on" from ambiguous name
             # Save local var 'hospital_info' to shot['hospital'] if so desired.
             # The window has an OK/Create hospital and a Cancel button
@@ -1647,13 +1666,23 @@ def popup_show_hospital_info(**kwargs):
             shot['hospital']['info']['updated-by'] = updated_user
             shot['hospital']['info']['version'] = original_version
             
+            # Set configured hospital
+            shot['conf_hosp'] = hospital_name
+            
+            
             # Debug messages
             print("Saved data to shot['hospital']") # debug
-            print(shot['hospital']) # debug
+            
+            # Add configured hospital to hospital database
+            hospital[hospital_name] = copy.deepcopy(shot['hospital'])
+            
+            # Debug messages
+            print('Saved data to hospital dict')
+            print(hospital) # debug
             
             # Write to config file
-            # TODO
-            print('write to config file.. TODO')
+            print(f"Writing config to {str(shot_config_file)}.. ")
+            write_config_to(shot_config_file)
         
 
 def add_hospital_section(sub_type, sub_name):
@@ -1850,32 +1879,20 @@ def popup_uinput_single_string(popup_query_type):
                 break
             elif uchname_event == uinput_popup_button_cancel:
                 break
-            elif uchname_event == uinput_popup_button_doit:
+            elif uchname_event == uinput_popup_button_doit or uchname_event == 'Return:36':
                 if uchname_vals[uinput_popup_keyname] == '':
                     pass
                 else:
                     uinput_input_val = str(uchname_vals[uinput_popup_keyname])
                     if 'username' in popup_query_type:
                         shot['username'] = uinput_input_val
+                        shot['conf_user'] = shot['username'] # TODO?
                         print(f"shot['username'] set to {shot['username']}") # debug
                     elif 'add_building' in popup_query_type or 'add_department' in popup_query_type:
                         if type(uinput_input_val) == bool or uinput_input_val == '':
                             pass # lazy eval, try pyinputplus here or what?
                         else:
                             run_this_popup = uinput_input_val
-                        
-                        
-#                        if add_hospital_section('bld', uinput_input_val):
- #                           run_this_popup = True
-  #                      else:
-   #                         run_this_popup = False
-#                    elif 'add_department' in popup_query_type:
- #                       run_this_popup = uinput_input_val
- #                       
- #                       if add_hospital_section('dep', uinput_input_val):
- #                           run_this_popup = True
- #                       else:
- #                           run_this_popup = False
                 break
         popup_query_user.close()
     
