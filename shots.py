@@ -613,8 +613,13 @@ def room_list_from_arbitray_str(input_str):
                     #
                     # This is the limit of what we can be expected to support based on arbitrary user input.
                     
-                    concat_begend = split_beg[0] + split_beg[1]
-                    if list(concat_begend) == sorted(concat_begend) or (concat_begend == (split_end[0]+split_end[1])): # check whether we're alphabetical (e.g. does the first letter (A) come before the second letter (B) ?)
+                    # BUG notif
+                    # TODO bug in here, when range is 'A001-A199' 0 rooms are added.
+                    # Probably a leading zero bug.
+                    
+                    former = split_beg[:2]
+                    latter = split_end[:2]
+                    if (list(former) == sorted(former)) or (former == latter) or (former[1] == '0' and int(former[1]) == int(latter[1])-1): # check whether we're alphabetical (e.g. does the first letter (A) come before the second letter (B) ?)
                         # Get length to establish padding/preceding zeroes (if any)
                         # e.g. if len is 3 and value is 20, we print 020, else just 20.
                         output_len = len(split_beg[1:])
@@ -1005,7 +1010,7 @@ def popup_new_hospital(returntofunc):
                 #name_new_hospital.Finalize
                 if name_hosp_vals['popup_new_hospital_fullname'] is None or name_hosp_vals['popup_new_hospital_fullname'] == '':
                     name_new_hospital['popup_new_hospital_fullname'].update(name_hosp_vals['popup_new_hospital_name'])
-        elif name_hosp_event == button_doit:
+        elif name_hosp_event == button_doit or name_hosp_event == 'Return:36':
             if name_hosp_vals['popup_new_hospital_name'] is None or name_hosp_vals['popup_new_hospital_name'] == '':
                 there_was_an_error = 'name'
                 break
@@ -1013,7 +1018,6 @@ def popup_new_hospital(returntofunc):
                 there_was_an_error = 'fullname'
                 break
             else:
-                print('do it') # debug
                 proceed_to_create_hospital = True # only if vals are set correctly (and not '')
                 break
             
@@ -1533,10 +1537,6 @@ def popup_show_hospital_info(**kwargs):
                 elif rooms_in_total == 0:
                     popup_some_error(f"{shot['msg_hospital_overview']} {shot['msg_hospital_no_rooms']}")
                 else:
-                    if hosp_info_event == shot['msg_hospital_create']:
-                        do_create_hospital = True
-                    else:
-                        do_create_hospital = False
                     do_go_on = True # Save to "real" dict
                     break
             
@@ -1600,10 +1600,11 @@ def popup_show_hospital_info(**kwargs):
             # We'll only prompt when there's an existing config to avoid having to re-check for missing data here
             if not create_new:
                 do_go_on = sg.popup(f"{shot['msg_unsaved_changes']} {hospital_name}.\n{shot['msg_savechanges']}?", title=f"{shot['msg_savechanges']}?", custom_text=(shot['file_save'],shot['msg_cancel']))
-                do_go_on = True if do_go_on == True else False
+                do_go_on = True if do_go_on == shot['file_save'] else False
             
         
         if do_go_on:
+            print('debug: saving data')
             # TODO rename "do_go_on" from ambiguous name
             # Save local var 'hospital_info' to shot['hospital'] if so desired.
             # The window has an OK/Create hospital and a Cancel button
@@ -1619,18 +1620,24 @@ def popup_show_hospital_info(**kwargs):
             # hospital['MadeUp Hospital']['blds'][_building name_] = [ list of rooms in building ]    
             # Then we have the custom (unique ones)
             
-            if do_create_hospital:
+            if create_new:
                 try:
-                    shot['hospital'] # might not exist yet.. 
+                    shot['hospital'] # might not exist yet..
                 except:
                     shot['hospital'] = {} # just to be safe ..
             else:
+                # Since we're updating existing config, set current timestamp
                 updated_tstamp = datetime.datetime.now().isoformat()
             
             # Save hospital information to dict using copy
             shot['hospital'] = copy.deepcopy(hospital_info)
-            
+
             # Save meta data too
+            try:
+                shot['hospital']['info'] # Test for 'info' subkey after deepcopy ..
+            except:
+                shot['hospital']['info'] = {}
+            
             # These are setup/fetched at the top of the function, and should be safe
             shot['hospital']['info']['name'] = hospital_name
             shot['hospital']['info']['legal'] = hospital_fullname
@@ -1643,7 +1650,10 @@ def popup_show_hospital_info(**kwargs):
             # Debug messages
             print("Saved data to shot['hospital']") # debug
             print(shot['hospital']) # debug
-        
+            
+            # Write to config file
+            # TODO
+            print('write to config file.. TODO')
         
 
 def add_hospital_section(sub_type, sub_name):
