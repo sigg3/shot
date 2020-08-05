@@ -607,10 +607,104 @@ def arbitrary_str_from_room_list(input_list):
     """
     The opposite of room_list_from_arbitrary_str()
     Returns a "calculated" human-readable string of list contents, e.g.
-    For ['A134', 'A135', 'A136', 'A138'], we'll get "A134-A136, A138" 
+    For ['A134', 'A135', 'A136', 'A138'], we'll get "A134-A136, A138" for settings.ini, see write_config_to()
     """
-    # TODO
-    pass
+    
+    # sort input
+    input_list.sort()
+    input_len = len(input_list)
+    
+    # set return object
+    formatted_list = []
+    
+    # set alphabetical ranges for ord()
+    # Done once, to check that we're in A-Z a-z range, respectively
+    accepted_ranges = [ x for x in range(65, 91) ] # A-Z (ends on 90)
+    accepted_ranges += [ x for x in range(97, 123) ] # a-z (ends on 122)
+    accepted_ranges += [ 198, 216, 197, 230, 248, 229 ] # Norwegian last letters
+    # + add any of your own language's special chars here, if applicable
+    
+    # Detect pattern in list items and append ranges (as strings) to formatted_list
+    # Note: we cannot assume there is only one pattern, so we must deal with all members individually
+    for idx, inp in enumerate(input_list):
+        nxt = idx+1
+        nxt = input_list[nxt] if nxt < input_len else inp # 'inp' here allows check for identity
+        prv = idx-1
+        prv = input_list[prv] if prv > 0 else inp # same
+        
+        if inp is nxt: # last one 
+            if inp.isdigit():
+                # simple digit (int)
+                if str(int(inp-1)) in input_list:
+                    formatted_list.append(f'{array_beg}-{inp}') # append range
+                else:
+                    formatted_list.append(inp) # append individual (int/digit) room
+            elif inp[0].isalpha() and inp[1:].isdigit():
+                # simple alphanumeric, e.g. A100 and A022
+                if prv == inp: # first one, too
+                    formatted_list.append(inp) # append individual room as-is
+                elif prv[0].isalpha() and prv[1:].isdigit():
+                    # simple alphanumeric previous too
+                    if inp[0] == prv[0]:
+                        # same series
+                        if int(inp[1:])-1 == int(prv[1:]):
+                            formatted_list.append(f'{array_beg}-{inp}') # append range
+                        else:
+                            # not contiguous
+                            formatted_list.append(inp) # append individual room as-is
+                    elif ord(inp[0]) == ord(prv[0])+1:
+                        if int(inp[1:]) <= 1: # allow rooms to start at 0
+                            formatted_list.append(f'{array_beg}-{inp}') # append range
+                        else:
+                            formatted_list.append(inp) # append individual room as-is
+                    else:
+                        formatted_list.append(inp) # append individual room as-is
+                
+            else:
+                # check if complex alphanumeric
+                # If the tail parts are ints and the preceeding parts (non-digits) are identical (e.g. HS10B100-HS10B399), we have a complex alphanumeric we can deal with (HS10B treated as mere symbols)
+                # What we do here is reverse the string char by char until we don't get a digit. Everything after that is pretext (e.g. HS10B symbol).
+                    
+                my_numbers = ''
+                my_pretext = ''
+                for inchar in inp[::-1]:
+                    if inchar.isdigit():
+                        my_numbers += inchar
+                    else:
+                        my_pretext += inchar
+                
+                my_numbers = my_numbers[::-1] # reverse back
+                my_pretext = my_pretext[::-1]
+                
+                if my_numbers and my_pretext:
+                    if f"{my_pretext}{int(my_numbers)-1}" in my_list:
+                        formatted_list.append(f'{array_beg}-{inp}') # append range
+                    else:
+                        formatted_list.append(inp) # append individual
+                else:
+                    formatted_list.append(inp)  # unrecognized, append as individual
+        else:
+            if inp.isdigit():
+                if str(int(inp)+1) in input_list:
+                    if str(int(inp)-1) in input_list:
+                        continue
+                    else:
+                        array_beg = inp
+                elif str(int(inp-1)) in input_list:
+                    # since we have sorted the list first, we can assume that any array_beg is set already
+                    formatted_list.append(f'{array_beg}-{inp}') # append range
+                else:
+                    formatted_list.append(inp) # append individual (int/digit) room
+            
+                    
+                            
+        
+    # Simple digits
+    
+    # Digits with preceeding ordered symbol
+    
+    # Digits with preceeding unordered symbol
+    
     
     
 def room_list_from_arbitray_str(input_str):
@@ -627,6 +721,14 @@ def room_list_from_arbitray_str(input_str):
     # set return objects
     formatted_list = []
     skipped_items = []
+    
+    
+    # set alphabetical ranges for ord()
+    # Done once, to check that we're in A-Z a-z range, respectively
+    accepted_ranges = [ x for x in range(65, 91) ] # A-Z (ends on 90)
+    accepted_ranges += [ x for x in range(97, 123) ] # a-z (ends on 122)
+    accepted_ranges += [ 198, 216, 197, 230, 248, 229 ] # Norwegian last letters
+    # + add any of your own language's special chars here, if applicable
     
     if type(input_str) is str:
         for single_room in input_str.split(sep=','):
@@ -650,10 +752,6 @@ def room_list_from_arbitray_str(input_str):
                     # Signify desired size by using preceeding zeroes: A020-B020 will assume 999 rooms in A and B (and add 20..999 in A and 1-20 in B)
                     #
                     # This is the limit of what we can be expected to support based on arbitrary user input.
-                    
-                    # BUG notif
-                    # TODO bug in here, when range is 'A001-A199' 0 rooms are added.
-                    # Probably a leading zero bug.
                     
                     former = split_beg[:2]
                     latter = split_end[:2]
@@ -679,13 +777,6 @@ def room_list_from_arbitray_str(input_str):
                         #
                         # In [60]: ord(split_end[0])                                                   
                         # Out[60]: 66
-                        
-                        # To check that we're in A-Z a-z range, respectively
-                        accepted_ranges = [ x for x in range(65, 91) ] # A-Z (ends on 90)
-                        accepted_ranges += [ x for x in range(97, 123) ] # a-z (ends on 122)
-                        accepted_ranges += [ 198, 216, 197, 230, 248, 229 ] # Norwegian last letters
-                        # + add any of your own language's special chars here, if applicable                        
-                        
                         
                         for symbol_id in range(ord(split_beg[0]),ord(split_end[0])+1):
                             if symbol_id in accepted_ranges:
