@@ -626,48 +626,77 @@ def arbitrary_str_from_room_list(input_list):
     
     # Detect pattern in list items and append ranges (as strings) to formatted_list
     # Note: we cannot assume there is only one pattern, so we must deal with all members individually
-    for idx, inp in enumerate(input_list):
-        nxt = idx+1
-        nxt = input_list[nxt] if nxt < input_len else inp # 'inp' here allows check for identity
-        prv = idx-1
-        prv = input_list[prv] if prv > 0 else inp # same
-        
-        if inp is nxt: # last one 
-            if inp.isdigit():
-                # simple digit (int)
-                if str(int(inp-1)) in input_list:
-                    formatted_list.append(f'{array_beg}-{inp}') # append range
+    for idx, current in enumerate(input_list):
+        if current.isalpha():
+            formatted_list.append(current) # we don't serialize pure words
+        elif current.isdigit():
+            if str(int(current-1)) in input_list:
+                if str(int(current+1)) in input_list:
+                    continue
                 else:
-                    formatted_list.append(inp) # append individual (int/digit) room
-            elif inp[0].isalpha() and inp[1:].isdigit():
-                # simple alphanumeric, e.g. A100 and A022
-                if prv == inp: # first one, too
-                    formatted_list.append(inp) # append individual room as-is
-                elif prv[0].isalpha() and prv[1:].isdigit():
-                    # simple alphanumeric previous too
-                    if inp[0] == prv[0]:
-                        # same series
-                        if int(inp[1:])-1 == int(prv[1:]):
-                            formatted_list.append(f'{array_beg}-{inp}') # append range
-                        else:
-                            # not contiguous
-                            formatted_list.append(inp) # append individual room as-is
-                    elif ord(inp[0]) == ord(prv[0])+1:
-                        if int(inp[1:]) <= 1: # allow rooms to start at 0
-                            formatted_list.append(f'{array_beg}-{inp}') # append range
-                        else:
-                            formatted_list.append(inp) # append individual room as-is
-                    else:
-                        formatted_list.append(inp) # append individual room as-is
-                
+                    formatted_list.append(f'{array_beg}-{current}') # append range
             else:
-                # check if complex alphanumeric
-                # If the tail parts are ints and the preceeding parts (non-digits) are identical (e.g. HS10B100-HS10B399), we have a complex alphanumeric we can deal with (HS10B treated as mere symbols)
-                # What we do here is reverse the string char by char until we don't get a digit. Everything after that is pretext (e.g. HS10B symbol).
+                if str(int(current+1)) in input_list:
+                    array_beg = current
+                else:
+                    formatted_list.append(current)
+        else:
+            # booleans to determine whether we're dealing with simple alphanumeric code (e.g. A199-A299)
+            current_first_alpha = current[0].isalpha()
+            current_rest_digits = current[1:].isdigit()
+            current_accepted_range = False 
+            
+            # configure bools according to input
+            if current_first_alpha and current_rest_digits:
+                if ord(current[0]) in accepted_ranges:
+                    current_accepted_range = True
                     
+                    # basic indexing
+                    nxt = idx+1
+                    prv = idx-1
+                    nxt = input_list[nxt] if nxt < input_len else current # 'current' here allows check for identity        
+                    prv = input_list[prv] if prv > 0 else current # same
+                    
+                    # set safe defaults for bools
+                    prv_first_alpha, prv_rest_digits, prv_is_contiguous = False, False, False
+                    nxt_first_alpha, nxt_rest_digits, nxt_is_contiguous = False, False, False
+                    
+                    # Is previous related chronologically to current?
+                    prv_first_alpha = prv[0].isalpha()  # previous item first char is alpha?
+                    prv_rest_digits = prv[1:].isdigit() # previous item remaining chars digits (int)?
+                    if prv_first_alpha and prv_rest_digits:
+                        if ord(prv[0]) in accepted_ranges:
+                            if current is not prv:
+                                if current[0] == prv[0]:
+                                    if int(current[1:]) > int(prv[1:]): prv_is_contiguous = True
+                    
+                    # Is the next one related chronologically to current?
+                    nxt_first_alpha = nxt[0].isalpha()  # next item first char is alpha?
+                    nxt_rest_digits = nxt[1:].isdigit() # next item remaining chars digits (int)?
+                    if nxt_first_alpha and nxt_rest_digits:
+                        if ord(nxt[0]) in accepted_ranges:
+                            if current is not nxt:
+                                if current[0] == nxt[0]:
+                                    if int(current[1:]) < int(nxt[1:]): nxt_is_contiguous = True
+                    
+            
+            # check for simple alphanumeric ordering
+            if current_accepted_range:
+                if prv_is_contiguous and nxt_is_contiguous:
+                    continue # we're in the middle of a series
+                elif nxt_is_contiguous:
+                    array_beg = current
+                elif prv_is_contiguous:
+                    formatted_list.append(f'{array_beg}-{current}') # append range
+                else:
+                    formatted_list.append(current) # lone wolf
+            else:
+                # check for complex alphanumeric ordering
+                # If the tail parts are ints and the preceeding parts (non-digits) are identical (e.g. HS10B100-HS10B399), we have a complex alphanumeric we can deal with (HS10B treated as mere symbols)
+                # What we do here is reverse the string char by char until we don't get a digit. Everything after that is pretext (e.g. HS10B symbol).                    
                 my_numbers = ''
                 my_pretext = ''
-                for inchar in inp[::-1]:
+                for inchar in current[::-1]:
                     if inchar.isdigit():
                         my_numbers += inchar
                     else:
@@ -677,34 +706,18 @@ def arbitrary_str_from_room_list(input_list):
                 my_pretext = my_pretext[::-1]
                 
                 if my_numbers and my_pretext:
-                    if f"{my_pretext}{int(my_numbers)-1}" in my_list:
-                        formatted_list.append(f'{array_beg}-{inp}') # append range
-                    else:
-                        formatted_list.append(inp) # append individual
+                    if f"{my_pretext}{int(my_numbers)-1}" in input_list and f"{my_pretext}{int(my_numbers)+1}" in input_list:
+                        continue # middle of series
+                    elif f"{my_pretext}{int(my_numbers)+1}" in input_list:
+                        array_beg = current
+                    elif f"{my_pretext}{int(my_numbers)-1}" in input_list:
+                        formatted_list.append(f'{array_beg}-{current}') # append range
                 else:
-                    formatted_list.append(inp)  # unrecognized, append as individual
-        else:
-            if inp.isdigit():
-                if str(int(inp)+1) in input_list:
-                    if str(int(inp)-1) in input_list:
-                        continue
-                    else:
-                        array_beg = inp
-                elif str(int(inp-1)) in input_list:
-                    # since we have sorted the list first, we can assume that any array_beg is set already
-                    formatted_list.append(f'{array_beg}-{inp}') # append range
-                else:
-                    formatted_list.append(inp) # append individual (int/digit) room
-            
-                    
-                            
-        
-    # Simple digits
+                    # Not a digit, simple or complex ordered item: append as-is
+                    formatted_list.append(current) # append individual room as-is
     
-    # Digits with preceeding ordered symbol
-    
-    # Digits with preceeding unordered symbol
-    
+    # return arbitrary string from our list
+    return ", ".join(sorted(formatted_list))
     
     
 def room_list_from_arbitray_str(input_str):
