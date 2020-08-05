@@ -187,52 +187,70 @@ def write_config_to(config_file):
             config[hospital_id][infovar] = infoval
         
         
-        # TODO FIX THIS CONFUSION
-        # We have moved away from some of these denominations.
-        # We can safely use [first_part_of_hospital_name]+bld and +dep
         
+        # explanatory settings.ini snippet
+        # information and references to contents "links" are in OPTIONS
+        #
+        # [OPTIONS]
+        # ...
+        # hospital = Chicago Hope
+        # ...
+        # 
+        # [Chicago Hope]
+        # legal = full legal name of hospital
+        # buildings = ChicagoBlds
+        # departments = ChicagoDeps
+        #
+        # [ChicagoBlds]
+        # ; buildings and rooms in the hospital 
+        #
+        # [ChicagoDeps]
+        # ; departments and rooms in the hospital
+        #
+        # buildings = <foo> in OPTIONS is a "link" or reference to subsection <foo> containing
+        #   building 1: room 1-3
+        #   building 2: room 8-9
+        # etc.
         
         
         # Hospital subsections (buildings, departments):
-        for subsect in 'bld', 'dep':
-            if 'bld' in subsect:
-                subsect_str = 'buildings'
-            else:
-                subsect_str = 'departments'
-            
-            # Standard default subsec names
-            check_str = hospital[hospital_id]['info']['name'].split()[0] + subsect.capitalize()
-            alt_check = check_str + str(len(hospital[hospital_id]['info']['name']))
-            
-            # Configured actual subsec name
-            if subsect in hospital[hospital_id].keys():
-                subsect_name = subsect
-            else:
-                print(f"Error: cannot find appropriate key {subsect} for hospital[{hospital_id}] type {subsect_str}")
+        for room_container in 'bld', 'dep':
+            # Textual string for configuration file readability
+            subsection_str = 'buildings' if room_container == 'bld' else 'departments'
+
+            # Check for presence
+            if room_container not in hospital[hospital_id].keys():
+                print(f"Error: cannot find appropriate key {room_container} for hospital[{hospital_id}] type {subsection_str}")
+                # TO PONDER: We cannot handle this here. Our objective is to write the config we have, not the one we deserve.
                 continue
 
-            # Non-standard name might be on purpose (to avoid dupliate)
-            # Note: we should not do any error correction here, it makes more sense to do duplicate avoidance in Create New Hospital scenarios..
-            if subsect_name != check_str and subsect_name != alt_check:
-                print(f"Warning: using non-standard '{subsect_str}' var: {subsect_name}")
+            # Standard subsec title strings (the [TITLE] part of ini files)
+            subsection_title = hospital[hospital_id]['info']['name'].split()[0] + room_container.capitalize()
+            
+            # In case of several similarly named, use the alternative scheme:
+            # TODO: check if this is okay with read_config_from().. shouldn't matter since it's a link name..
+            number_of_hospitals = len(hospital.keys())
+            number_of_unique_first_names = len(set([ x.split()[0] for x in hospital.keys() ]))
+            if number_of_hospitals != number_of_unique_first_names: # use non-standard to avoid dupliate
+                subsection_title = subsection_title + str(len(hospital[hospital_id]['info']['legal'])) # adds INT len of legal name to string
             
             # Write configured hospital/dept string to hospital section in config file
-            config[hospital_id][subsect_str] = subsect_name
+            config[hospital_id][subsection_str] = subsection_title
             
             # Create section (dict) in config file
-            config[subsect_str] = {}
+            config[subsection_title] = {}
             
             
             # DEBUG
-            print('skipping rooms DEBUG') # requires rewrite of below snippets
+            print('skipping rooms DEBUG') # requires rewrite of below snippets: use "arbitrary str from room list" function instead
             continue
 
             
             # Populate section with room var name (array identifier) and corresponding rooms (values)
-            for array_identifier, room_array in hospital[hospital_id][subsect.lower()].items():
+            for array_identifier, room_array in hospital[hospital_id][room_container].items():
                 
                 # Pack room array into human-readable ranges before saving
-                config[subsect_str][array_identifier] = []
+                config[subsection_title][array_identifier] = []
                 
                 # use int-list in case configparser or shot changes room number to str  #### TODO: This will break. update to allow alphanumeric! TODO ####
                 rooms_asint = [ int(room) for room in room_array ]
@@ -249,9 +267,9 @@ def write_config_to(config_file):
                             array_beg = disroom
                     elif disroom-1 in rooms_asint:
                         # since we have sorted the list first, we can assume that any array_beg is set already
-                        config[subsect_str][array_identifier].append(f'{array_beg}-{disroom}') # append range
+                        config[subsection_title][array_identifier].append(f'{array_beg}-{disroom}') # append range
                     else:
-                        config[subsect_str][array_identifier].append(disroom) # append individual
+                        config[subsection_title][array_identifier].append(disroom) # append individual
             
 
     
@@ -588,7 +606,7 @@ def gender_from_fnr(fnr):
 def arbitrary_str_from_room_list(input_list):
     """
     The opposite of room_list_from_arbitrary_str()
-    Returns a "calulated" human-readable string of list contents, e.g.
+    Returns a "calculated" human-readable string of list contents, e.g.
     For ['A134', 'A135', 'A136', 'A138'], we'll get "A134-A136, A138" 
     """
     # TODO
@@ -606,7 +624,7 @@ def room_list_from_arbitray_str(input_str):
     check a returned object using e.g. len(my_saved_list) > 0
     """
     
-    # establish return objects
+    # set return objects
     formatted_list = []
     skipped_items = []
     
