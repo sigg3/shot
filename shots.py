@@ -692,18 +692,23 @@ def arbitrary_str_from_room_list(input_list):
                     formatted_list.append(current) # lone wolf
             else:
                 # check for complex alphanumeric ordering
-                # If the tail parts are ints and the preceeding parts (non-digits) are identical (e.g. HS10B100-HS10B399), we have a complex alphanumeric we can deal with (HS10B treated as mere symbols)
+                # If the tail parts are digits and the preceeding parts (non-digits) are identical (e.g. HS10B100-HS10B399), we have a complex alphanumeric we can deal with (HS10B treated as mere symbols)
                 # What we do here is reverse the string char by char until we don't get a digit. Everything after that is pretext (e.g. HS10B symbol).                    
                 my_numbers = ''
                 my_pretext = ''
-                for inchar in current[::-1]:
-                    if inchar.isdigit():
-                        my_numbers += inchar
+                still_just_digits = True
+                for inchar in current[::-1]: # reverse current (e.g. HS10X001 => 100X01SH)
+                    if still_just_digits:
+                        if inchar.isdigit():
+                            my_numbers += inchar
+                        else:
+                            my_pretext += inchar
+                            still_just_digits = False
                     else:
                         my_pretext += inchar
                 
-                my_numbers = my_numbers[::-1] # reverse back
-                my_pretext = my_pretext[::-1]
+                my_numbers = my_numbers[::-1] # reverse back (001)
+                my_pretext = my_pretext[::-1] # reverse back (HS10X)
                 
                 if my_numbers and my_pretext:
                     if f"{my_pretext}{int(my_numbers)-1}" in input_list and f"{my_pretext}{int(my_numbers)+1}" in input_list:
@@ -712,6 +717,8 @@ def arbitrary_str_from_room_list(input_list):
                         array_beg = current
                     elif f"{my_pretext}{int(my_numbers)-1}" in input_list:
                         formatted_list.append(f'{array_beg}-{current}') # append range
+                    else:
+                        formatted_list.append(current) # append as-is
                 else:
                     # Not a digit, simple or complex ordered item: append as-is
                     formatted_list.append(current) # append individual room as-is
