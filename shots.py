@@ -603,7 +603,7 @@ def gender_from_fnr(fnr):
 
 # Hospital management functions
 
-def arbitrary_str_from_room_list(input_list):
+def arbitrary_str_from_room_list(input_list: list) -> str:
     """
     The opposite of room_list_from_arbitrary_str()
     Returns a "calculated" human-readable string of list contents, e.g.
@@ -630,13 +630,17 @@ def arbitrary_str_from_room_list(input_list):
         if current.isalpha():
             formatted_list.append(current) # we don't serialize pure words
         elif current.isdigit():
-            if str(int(current-1)) in input_list:
-                if str(int(current+1)) in input_list:
+            digit_lower = str(int(current) - 1)
+            digit_higher = str(int(current) + 1)
+            digit_lower = digit_lower.zfill(len(current))
+            digit_higher = digit_higher.zfill(len(current))
+            if digit_lower in input_list:
+                if digit_higher in input_list:
                     continue
                 else:
                     formatted_list.append(f'{array_beg}-{current}') # append range
             else:
-                if str(int(current+1)) in input_list:
+                if digit_higher in input_list:
                     array_beg = current
                 else:
                     formatted_list.append(current)
@@ -654,8 +658,12 @@ def arbitrary_str_from_room_list(input_list):
                     # basic indexing
                     nxt = idx+1
                     prv = idx-1
-                    nxt = input_list[nxt] if nxt < input_len else current # 'current' here allows check for identity        
-                    prv = input_list[prv] if prv > 0 else current # same
+                    
+                    # debug
+                    #if current == 'A135': IPython.embed()
+                    
+                    nxt = input_list[nxt] if nxt < input_len else current # 'current' here allows check for identity
+                    prv = input_list[prv] if idx > 0 else current # same
                     
                     # set safe defaults for bools
                     prv_first_alpha, prv_rest_digits, prv_is_contiguous = False, False, False
@@ -668,7 +676,7 @@ def arbitrary_str_from_room_list(input_list):
                         if ord(prv[0]) in accepted_ranges:
                             if current is not prv:
                                 if current[0] == prv[0]:
-                                    if int(current[1:]) > int(prv[1:]): prv_is_contiguous = True
+                                    if int(prv[1:]) == (int(current[1:]) - 1): prv_is_contiguous = True
                     
                     # Is the next one related chronologically to current?
                     nxt_first_alpha = nxt[0].isalpha()  # next item first char is alpha?
@@ -677,8 +685,9 @@ def arbitrary_str_from_room_list(input_list):
                         if ord(nxt[0]) in accepted_ranges:
                             if current is not nxt:
                                 if current[0] == nxt[0]:
-                                    if int(current[1:]) < int(nxt[1:]): nxt_is_contiguous = True
-                    
+                                    if int(nxt[1:]) == (int(current[1:]) + 1): nxt_is_contiguous = True
+            
+
             
             # check for simple alphanumeric ordering
             if current_accepted_range:
@@ -727,7 +736,7 @@ def arbitrary_str_from_room_list(input_list):
     return ", ".join(sorted(formatted_list))
     
     
-def room_list_from_arbitray_str(input_str):
+def room_list_from_arbitray_str(input_str:str) -> list:
     """
     Takes an arbitrary "room list string" from e.g. popup_new_room() containing a string
     that feature a comma separated list of digits or ranges (including alphanumeric ranges).
@@ -751,6 +760,7 @@ def room_list_from_arbitray_str(input_str):
     # + add any of your own language's special chars here, if applicable
     
     if type(input_str) is str:
+        input_str = ''.join(input_str.split()) # remove white space chars
         for single_room in input_str.split(sep=','):
             if input_str.isdigit():
                 formatted_list.append(single_room) # single room (recommended practice)
@@ -798,6 +808,9 @@ def room_list_from_arbitray_str(input_str):
                         # In [60]: ord(split_end[0])                                                   
                         # Out[60]: 66
                         
+                        # TODO use zfill for zero padding _str_ objects:
+                        #   digit_higher = digit_higher.zfill(len(current))
+                        
                         for symbol_id in range(ord(split_beg[0]),ord(split_end[0])+1):
                             if symbol_id in accepted_ranges:
                                 symbol_is = chr(symbol_id) # alphabet char of symbol_id
@@ -817,31 +830,35 @@ def room_list_from_arbitray_str(input_str):
                     # If the tail parts are ints and the preceeding parts (non-digits) are identical (e.g. HS10B100-HS10B399), we have a complex alphanumeric we can deal with (HS10B treated as mere symbols)
                     # What we do here is reverse the string char by char until we don't get a digit. Everything after that is pretext (e.g. HS10B symbol).
                     
+                    
                     for str_to_chk in split_beg, split_end:
-                        room_is_int = True
+                        still_just_digits = True
                         my_numbers = ''
                         my_pretext = ''
                         for inchar in str_to_chk[::-1]:
-                            if not inchar.isdigit(): room_is_int = False
-                            if room_is_int:
-                                my_numbers += inchar
+                            if still_just_digits:
+                                if inchar.isdigit():
+                                    my_numbers += inchar
+                                else:
+                                    my_pretext += inchar
+                                    still_just_digits = False
                             else:
                                 my_pretext += inchar
-                        
+
                         if str_to_chk == split_beg:
-                            split_beg_numbers = my_numbers[::-1]
+                            split_beg_numbers = my_numbers[::-1] # reverse back
                             split_beg_pretext = my_pretext[::-1]
                         else:
                             split_end_numbers = my_numbers[::-1]
                             split_end_pretext = my_pretext[::-1]
                     
-                    if (split_beg_pretext == split_end_pretext) and (split_beg_numbers.isdigit() and split_end_numbers.isdigit()) and (int(split_beg_numbers) < int(split_end_numbers)):
+                    if (split_beg_pretext == split_end_pretext) and (int(split_beg_numbers) < int(split_end_numbers)): # removed 'and (split_beg_numbers.isdigit() and split_end_numbers.isdigit())'
                         # Need this to establish zero padding
-                        output_len = len(split_beg[1:])
-                        if len(split_end[1:]) > output_len: output_len = len(split_end[1:])
+                        output_len = len(split_beg[1:]) - len(split_beg_pretext)
+                        if len(split_end[1:]) > output_len: output_len = len(split_end[1:]) - len(split_beg_pretext)
                         
                         # Add to output list
-                        formatted_list += [ str(split_beg_pretext+f"{room_id:0{output_len}d}") for room_id in range(int(split_beg_numbers), int(split_end_numbers)) ] # python 3.6 format notation
+                        formatted_list += [ str(split_beg_pretext+f"{room_id:0{output_len}d}") for room_id in range(int(split_beg_numbers), int(split_end_numbers)+1) ] # python 3.6 format notation
                     else:
                         skipped_items.append(single_room) # can't establish an acceptable pattern
             elif len(single_room.split()) == 1:
